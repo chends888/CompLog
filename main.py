@@ -53,10 +53,10 @@ class Parser:
             num1 = self.tokens.actual
             num2 = False
         except:
-            raise ValueError('Token não encontrado')
+            raise ValueError('Token not found')
 
         if (num1.tokentype != 'int'):
-            raise SyntaxError('Inicio de operação inválido, primeiro elemento não é int', num1.tokentype)
+            raise SyntaxError('Invalid start, first element not int', num1.tokentype)
 
         self.tokens.selectNext()
         while self.tokens.actual.tokentype:
@@ -75,12 +75,15 @@ class Parser:
                 num2 = False
             self.tokens.selectNext()
         
-        print('Resultado:', num1.tokenvalue)
+        print('Result:', num1.tokenvalue, '\n')
 
     def run(self):
         return self.parserExpression(self)
 
-# test = '100    +11  -  1'
-# newTokenizer = Tokenizer(test)
-# newParser = Parser(newTokenizer)
-# newParser.run()
+#Testes
+while True:
+    print('Insert expression:')
+    test = input()
+    newTokenizer = Tokenizer(test)
+    newParser = Parser(newTokenizer)
+    newParser.run()
