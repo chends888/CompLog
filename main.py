@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+import operator
 
 class Token:
     def __init__(self, tokentype, tokenvalue):
@@ -12,7 +12,7 @@ class PrePro:
         flag = False
         procorigin = ''
         for i in origin:
-            if (i == "'"):
+            if (i == "'" or i == '\n'):
                 flag = not flag
                 continue
             if (flag):
@@ -58,60 +58,55 @@ class Tokenizer:
                 self.actual = Token('MULT', token)
             else:
                 self.actual = Token('DIV', token)
-        
-        if (self.position > (len(self.origin))):
-            self.actual = Token('EOF', 'EOF')
-            return
 
 
 class Parser:
-    @staticmethod
-    def parserExpression():
+    def termExpression():
         try:
             num1 = Parser.tokens.actual
-            num2 = False
         except:
             raise ValueError('Token not found')
-
-        if (num1.tokentype != 'INT'):
-            raise SyntaxError('Invalid start, first element %s is not int' % num1.tokentype)
-
-        op = 'f'
-        while (Parser.tokens.actual.tokenvalue != 'EOF'):
+        if (num1.tokentype == 'INT'):
+            res = int(num1.tokenvalue)
             Parser.tokens.selectNext()
-            if (Parser.tokens.actual.tokentype == 'PLUS' or Parser.tokens.actual.tokentype == 'MINUS' or Parser.tokens.actual.tokentype == 'DIV' or Parser.tokens.actual.tokentype == 'MULT'):
+            op = Parser.tokens.actual
+            while (op.tokentype == 'DIV' or op.tokentype == 'MULT'):
+                if (op.tokentype == 'DIV'):
+                    Parser.tokens.selectNext()
+                    num2 = Parser.tokens.actual
+                    if (num2.tokentype == 'INT'):
+                        res = res // int(num2.tokenvalue)
+                    else:
+                        raise ValueError('Unespected token type %s' %(num2.tokentype))
+                elif (op.tokentype == 'MULT'):
+                    Parser.tokens.selectNext()
+                    num2 = Parser.tokens.actual
+                    if (num2.tokentype == 'INT'):
+                        res *= int(num2.tokenvalue)
+                    else:
+                        raise ValueError('Unespected token type %s' %(num2.tokentype))
+                Parser.tokens.selectNext()
                 op = Parser.tokens.actual
+        else:
+            raise SyntaxError('Invalid token, element %s is not INT' %(num1.tokentype))
 
-            elif (Parser.tokens.actual.tokentype == 'INT'):
-                if (op == 'f'):
-                    raise SyntaxError('Unexpected token after %s' % num1.tokenvalue)
-                num2 = Parser.tokens.actual
+        return res
 
-            elif (Parser.tokens.actual.tokentype == 'EOF'):
-                break
-
-            if (op.tokentype == 'PLUS' and num2):
-                res = int(num1.tokenvalue) + int(num2.tokenvalue)
-                num2 = False
-                op = 'f'
-
-            elif (op.tokentype == 'MINUS' and num2):
-                res = int(num1.tokenvalue) - int(num2.tokenvalue)
-                num2 = False
-                op = 'f'
-
-            elif (op.tokentype == 'DIV' and num2):
-                res = int(num1.tokenvalue) // int(num2.tokenvalue)
-                num2 = False
-                op = 'f'
-
-            elif (op.tokentype == 'MULT' and num2):
-                res = int(num1.tokenvalue) * int(num2.tokenvalue)
-                num2 = False
-                op = 'f'
-            elif (Parser.tokens.position == len(Parser.tokens.origin)):
-                raise SyntaxError('Invalid operation %s%s' %(num1.tokenvalue, op.tokenvalue))
-
+    @staticmethod
+    def parserExpression():
+        allowed_operators={
+            "+": operator.add,
+            "-": operator.sub,
+            "*": operator.mul,
+            "//": operator.floordiv
+        }
+        res = Parser.termExpression()
+        op = Parser.tokens.actual
+        while (op.tokentype == 'PLUS' or op.tokentype == 'MINUS'):
+            Parser.tokens.selectNext()
+            num2 = Parser.termExpression()
+            res = allowed_operators[op.tokenvalue](res, num2)
+            op = Parser.tokens.actual
         return res
 
     def run(code):
@@ -126,6 +121,6 @@ class Parser:
 
 # Testes
 while True:
-    print('\nType a math operation (+, -, * and / allowed):')
+    print('\nType a math operation (+, -, * and // allowed):')
     test = input()
-    print('Result:', Parser.run(test))
+    print('\nResult:', Parser.run(test))
