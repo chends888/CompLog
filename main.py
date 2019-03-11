@@ -26,31 +26,25 @@ class Tokenizer:
         self.position = 0
         self.actual = Token('EOF', 'EOF')
         self.selectNext()
-        # print(self.actual.tokenvalue)
 
     def selectNext(self):
         while (self.position < len(self.origin) and self.origin[self.position] == ' '):
-            print('space')
             self.position += 1
 
         token = ''
         if (self.position >= (len(self.origin))):
             self.actual = Token('EOF', 'EOF')
-            print('EOF')
             return
 
         elif (self.origin[self.position].isdigit()):
-            print('position', self.position)
             while (self.origin[self.position].isdigit()):
                 token += self.origin[self.position]
                 self.position += 1
                 if (self.position == (len(self.origin))):
                     break
             self.actual = Token('INT', token)
-            # print('token value:', token)
 
         else:
-            print('not digit')
             while (not self.origin[self.position].isdigit()):
                 token += self.origin[self.position]
                 self.position += 1
@@ -67,7 +61,6 @@ class Tokenizer:
         
         if (self.position > (len(self.origin))):
             self.actual = Token('EOF', 'EOF')
-            print('EOF')
             return
 
 
@@ -86,24 +79,18 @@ class Parser:
         op = 'f'
         while (Parser.tokens.actual.tokenvalue != 'EOF'):
             Parser.tokens.selectNext()
-            print('loop')
-            print('token value:', Parser.tokens.actual.tokenvalue)
             if (Parser.tokens.actual.tokentype == 'PLUS' or Parser.tokens.actual.tokentype == 'MINUS' or Parser.tokens.actual.tokentype == 'DIV' or Parser.tokens.actual.tokentype == 'MULT'):
                 op = Parser.tokens.actual
-                print('op:', op.tokenvalue)
 
             elif (Parser.tokens.actual.tokentype == 'INT'):
-                print(op)
                 if (op == 'f'):
                     raise SyntaxError('Unexpected token after %s' % num1.tokenvalue)
                 num2 = Parser.tokens.actual
-                print(num2.tokenvalue)
 
             elif (Parser.tokens.actual.tokentype == 'EOF'):
                 break
 
             if (op.tokentype == 'PLUS' and num2):
-                print('ope')
                 res = int(num1.tokenvalue) + int(num2.tokenvalue)
                 num2 = False
                 op = 'f'
@@ -125,7 +112,6 @@ class Parser:
             elif (Parser.tokens.position == len(Parser.tokens.origin)):
                 raise SyntaxError('Invalid operation %s%s' %(num1.tokenvalue, op.tokenvalue))
 
-            print('pos:', Parser.tokens.position)
         return res
 
     def run(code):
@@ -140,6 +126,6 @@ class Parser:
 
 # Testes
 while True:
-    print('Type a math operation (+, -, * and / allowed):')
+    print('\nType a math operation (+, -, * and / allowed):')
     test = input()
     print('Result:', Parser.run(test))
