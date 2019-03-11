@@ -1,89 +1,145 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+
 class Token:
     def __init__(self, tokentype, tokenvalue):
         self.tokentype = tokentype
         self.tokenvalue = tokenvalue
 
+class PrePro:
+    def removeComments(origin):
+        flag = False
+        procorigin = ''
+        for i in origin:
+            if (i == "'"):
+                flag = not flag
+                continue
+            if (flag):
+                continue
+            procorigin += i
+        return procorigin
+
 class Tokenizer:
     def __init__(self, origin):
-        self.origin = origin
+        self.origin = PrePro.removeComments(origin)
         self.position = 0
-        self.actual = self.selectNext()
+        self.actual = Token('EOF', 'EOF')
+        self.selectNext()
+        # print(self.actual.tokenvalue)
 
     def selectNext(self):
-        if (self.position == (len(self.origin))):
-          self.actual = Token(None, None)
-          return Token(None, None)
-
-        token = ''
-        tokentype = ''
-        while self.position <= len(self.origin):
-            if (self.position == (len(self.origin))):
-              self.actual = Token(tokentype, int(token))
-              return
-
-            if (self.origin[self.position].isdigit()):
-                if (tokentype == 'op'):
-                    self.actual = Token(tokentype, token)
-                    return
-                token += self.origin[self.position]
-                tokentype = 'int'
-
-            elif (self.origin[self.position] == ' '):
-              self.position += 1
-              continue
-
-            else:
-                if (tokentype == 'int'):
-                    self.actual = Token(tokentype, int(token))
-                    return Token(tokentype, int(token))
-                token += self.origin[self.position]
-                tokentype = 'op'
+        while (self.position < len(self.origin) and self.origin[self.position] == ' '):
+            print('space')
             self.position += 1
 
-class Parser:
-    def __init__(self, tokens):
-        self.tokens = tokens
+        token = ''
+        if (self.position >= (len(self.origin))):
+            self.actual = Token('EOF', 'EOF')
+            print('EOF')
+            return
 
+        elif (self.origin[self.position].isdigit()):
+            print('position', self.position)
+            while (self.origin[self.position].isdigit()):
+                token += self.origin[self.position]
+                self.position += 1
+                if (self.position == (len(self.origin))):
+                    break
+            self.actual = Token('INT', token)
+            # print('token value:', token)
+
+        else:
+            print('not digit')
+            while (not self.origin[self.position].isdigit()):
+                token += self.origin[self.position]
+                self.position += 1
+                if (self.position == (len(self.origin))):
+                    break
+            if (token == '+'):
+                self.actual = Token('PLUS', token)
+            elif (token == '-'):
+                self.actual = Token('MINUS', token)
+            elif (token == '*'):
+                self.actual = Token('MULT', token)
+            else:
+                self.actual = Token('DIV', token)
+        
+        if (self.position > (len(self.origin))):
+            self.actual = Token('EOF', 'EOF')
+            print('EOF')
+            return
+
+
+class Parser:
     @staticmethod
-    def parserExpression(self):
+    def parserExpression():
         try:
-            num1 = self.tokens.actual
+            num1 = Parser.tokens.actual
             num2 = False
         except:
             raise ValueError('Token not found')
 
-        if (num1.tokentype != 'int'):
-            raise SyntaxError('Invalid start, first element not int', num1.tokentype)
+        if (num1.tokentype != 'INT'):
+            raise SyntaxError('Invalid start, first element %s is not int' % num1.tokentype)
 
-        self.tokens.selectNext()
-        while self.tokens.actual.tokentype:
-            if (self.tokens.actual.tokentype == 'op'):
-                op = self.tokens.actual.tokenvalue
+        op = 'f'
+        while (Parser.tokens.actual.tokenvalue != 'EOF'):
+            Parser.tokens.selectNext()
+            print('loop')
+            print('token value:', Parser.tokens.actual.tokenvalue)
+            if (Parser.tokens.actual.tokentype == 'PLUS' or Parser.tokens.actual.tokentype == 'MINUS' or Parser.tokens.actual.tokentype == 'DIV' or Parser.tokens.actual.tokentype == 'MULT'):
+                op = Parser.tokens.actual
+                print('op:', op.tokenvalue)
 
-            if (self.tokens.actual.tokentype == 'int'):
-                num2 = self.tokens.actual
+            elif (Parser.tokens.actual.tokentype == 'INT'):
+                print(op)
+                if (op == 'f'):
+                    raise SyntaxError('Unexpected token after %s' % num1.tokenvalue)
+                num2 = Parser.tokens.actual
+                print(num2.tokenvalue)
 
-            if op == '+' and num2:
-                num1.tokenvalue += num2.tokenvalue
+            elif (Parser.tokens.actual.tokentype == 'EOF'):
+                break
+
+            if (op.tokentype == 'PLUS' and num2):
+                print('ope')
+                res = int(num1.tokenvalue) + int(num2.tokenvalue)
                 num2 = False
+                op = 'f'
 
-            elif op == '-' and num2:
-                num1.tokenvalue -= num2.tokenvalue
+            elif (op.tokentype == 'MINUS' and num2):
+                res = int(num1.tokenvalue) - int(num2.tokenvalue)
                 num2 = False
-            self.tokens.selectNext()
-        
-        print('Result:', num1.tokenvalue, '\n')
+                op = 'f'
 
-    def run(self):
-        return self.parserExpression(self)
+            elif (op.tokentype == 'DIV' and num2):
+                res = int(num1.tokenvalue) // int(num2.tokenvalue)
+                num2 = False
+                op = 'f'
 
-#Testes
+            elif (op.tokentype == 'MULT' and num2):
+                res = int(num1.tokenvalue) * int(num2.tokenvalue)
+                num2 = False
+                op = 'f'
+            elif (Parser.tokens.position == len(Parser.tokens.origin)):
+                raise SyntaxError('Invalid operation %s%s' %(num1.tokenvalue, op.tokenvalue))
+
+            print('pos:', Parser.tokens.position)
+        return res
+
+    def run(code):
+        Parser.tokens = Tokenizer(code)
+        result = Parser.parserExpression()
+        if (Parser.tokens.actual.tokentype == 'EOF'):
+            return result
+        else:
+            raise EOFError('Program ended befor EOF')
+
+
+
+# Testes
 while True:
-    print('Insert expression:')
+    print('Type a math operation (+, -, * and / allowed):')
     test = input()
-    newTokenizer = Tokenizer(test)
-    newParser = Parser(newTokenizer)
-    newParser.run()
+    print('Result:', Parser.run(test))
