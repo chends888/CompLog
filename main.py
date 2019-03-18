@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
 import operator
 
 class Token:
@@ -11,13 +12,34 @@ class PrePro:
     def removeComments(origin):
         flag = False
         procorigin = ''
-        for i in origin:
-            if (i == "'" or i == '\n'):
-                flag = not flag
-                continue
-            if (flag):
-                continue
-            procorigin += i
+        i = 0
+        while i < len(origin):
+            print(flag)
+            if (i < len(origin)-1):
+                print (origin[i] + origin[i+1])
+                if (origin[i] == "'"):
+                    flag = not flag
+                    i += 1
+                    continue
+                if (origin[i] + origin[i+1] == '\\n'):
+                    flag = not flag
+                    i += 2
+                    continue
+                if (flag):
+                    i += 1
+                    continue
+                procorigin += origin[i]
+                i += 1
+            else:
+                if (origin[i] == "'"):
+                    flag = not flag
+                    i += 1
+                    continue
+                if (flag):
+                    i += 1
+                    continue
+                procorigin += origin[i]
+                i += 1
         return procorigin
 
 class Tokenizer:
@@ -54,8 +76,10 @@ class Tokenizer:
                 self.actual = Token('MINUS', token)
             elif (token == '*'):
                 self.actual = Token('MULT', token)
-            else:
+            elif (token == '//'):
                 self.actual = Token('DIV', token)
+            else:
+                raise ValueError('Unexpected operation %s' %(token))
 
 
 class Parser:
@@ -77,14 +101,14 @@ class Parser:
                     if (num2.tokentype == 'INT'):
                         res = res // int(num2.tokenvalue)
                     else:
-                        raise ValueError('Unespected token type %s' %(num2.tokentype))
+                        raise ValueError('Unexpected token type %s' %(num2.tokentype))
                 elif (op.tokentype == 'MULT'):
                     Parser.tokens.selectNext()
                     num2 = Parser.tokens.actual
                     if (num2.tokentype == 'INT'):
                         res *= int(num2.tokenvalue)
                     else:
-                        raise ValueError('Unespected token type %s' %(num2.tokentype))
+                        raise ValueError('Unexpected token type %s' %(num2.tokentype))
                 Parser.tokens.selectNext()
                 op = Parser.tokens.actual
         else:
