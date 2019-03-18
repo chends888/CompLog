@@ -14,9 +14,7 @@ class PrePro:
         procorigin = ''
         i = 0
         while i < len(origin):
-            print(flag)
             if (i < len(origin)-1):
-                print (origin[i] + origin[i+1])
                 if (origin[i] == "'"):
                     flag = not flag
                     i += 1
