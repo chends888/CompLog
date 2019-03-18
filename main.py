@@ -76,60 +76,76 @@ class Tokenizer:
                 self.actual = Token('MULT', token)
             elif (token == '//'):
                 self.actual = Token('DIV', token)
+            elif (token == '('):
+                self.actual = Token('(', token)
+            elif (token == ')'):
+                self.actual = Token(')', token)
             else:
                 raise ValueError('Unexpected operation %s' %(token))
 
 
 class Parser:
-    def termExpression():
+
+    def factorExpression():
         try:
-            num1 = Parser.tokens.actual
+            token1 = Parser.tokens.actual
         except:
             raise ValueError('Token not found')
-
-        if (num1.tokentype == 'INT'):
-            res = int(num1.tokenvalue)
+        if (token1.tokentype == 'INT'):
             Parser.tokens.selectNext()
-            op = Parser.tokens.actual
+            return int(token1.tokenvalue)
 
-            while (op.tokentype == 'DIV' or op.tokentype == 'MULT'):
-                if (op.tokentype == 'DIV'):
-                    Parser.tokens.selectNext()
-                    num2 = Parser.tokens.actual
-                    if (num2.tokentype == 'INT'):
-                        res = res // int(num2.tokenvalue)
-                    else:
-                        raise ValueError('Unexpected token type %s' %(num2.tokentype))
-                elif (op.tokentype == 'MULT'):
-                    Parser.tokens.selectNext()
-                    num2 = Parser.tokens.actual
-                    if (num2.tokentype == 'INT'):
-                        res *= int(num2.tokenvalue)
-                    else:
-                        raise ValueError('Unexpected token type %s' %(num2.tokentype))
+        elif (token1.tokentype == 'PLUS' or token1.tokentype == 'MINUS'):
+            if (token1.tokentype == 'PLUS'):
                 Parser.tokens.selectNext()
-                op = Parser.tokens.actual
-        else:
-            raise SyntaxError('Invalid token, element %s is not INT' %(num1.tokentype))
+                return +Parser.factorExpression()
+            elif (token1.tokentype == 'MINUS'):
+                Parser.tokens.selectNext()
+                return -Parser.factorExpression()
+            else:
+                raise SyntaxError('Unexpected unary operation %s' %(token1.tokenvalue))
+        elif (token1.tokentype == '('):
+            Parser.tokens.selectNext()
+            expr = Parser.parserExpression()
+            if (Parser.tokens.actual.tokentype == ')'):
+                Parser.tokens.selectNext()
+                return expr
+            else:
+                raise SyntaxError('Unexpected token  %s, expected ")"' %(Parser.tokens.actual.tokenvalue))
 
-        return res
+        else:
+            raise SyntaxError('Invalid token, element %s is not INT' %(token1.tokentype))
+
+
+    def termExpression():
+        allowed_operators={
+            "*": operator.mul,
+            "//": operator.floordiv
+        }
+        factor1 = Parser.factorExpression()
+        op = Parser.tokens.actual
+
+        while (op.tokentype == 'DIV' or op.tokentype == 'MULT'):
+            Parser.tokens.selectNext()
+            factor2 = Parser.factorExpression()
+            factor1 = allowed_operators[op.tokenvalue](factor1, factor2)
+            op = Parser.tokens.actual
+        return factor1
 
     @staticmethod
     def parserExpression():
         allowed_operators={
             "+": operator.add,
-            "-": operator.sub,
-            "*": operator.mul,
-            "//": operator.floordiv
+            "-": operator.sub
         }
-        res = Parser.termExpression()
+        term1 = Parser.termExpression()
         op = Parser.tokens.actual
         while (op.tokentype == 'PLUS' or op.tokentype == 'MINUS'):
             Parser.tokens.selectNext()
-            num2 = Parser.termExpression()
-            res = allowed_operators[op.tokenvalue](res, num2)
+            term2 = Parser.termExpression()
+            term1 = allowed_operators[op.tokenvalue](term1, term2)
             op = Parser.tokens.actual
-        return res
+        return term1
 
     def run(code):
         Parser.tokens = Tokenizer(code)
@@ -137,7 +153,7 @@ class Parser:
         if (Parser.tokens.actual.tokentype == 'EOF'):
             return result
         else:
-            raise EOFError('Program ended befor EOF')
+            raise EOFError('Program ended before EOF')
 
 
 
