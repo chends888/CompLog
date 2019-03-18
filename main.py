@@ -45,11 +45,9 @@ class Tokenizer:
             self.actual = Token('INT', token)
 
         else:
-            while (not self.origin[self.position].isdigit()):
+            if (not self.origin[self.position].isdigit()):
                 token += self.origin[self.position]
                 self.position += 1
-                if (self.position == (len(self.origin))):
-                    break
             if (token == '+'):
                 self.actual = Token('PLUS', token)
             elif (token == '-'):
@@ -66,10 +64,12 @@ class Parser:
             num1 = Parser.tokens.actual
         except:
             raise ValueError('Token not found')
+
         if (num1.tokentype == 'INT'):
             res = int(num1.tokenvalue)
             Parser.tokens.selectNext()
             op = Parser.tokens.actual
+
             while (op.tokentype == 'DIV' or op.tokentype == 'MULT'):
                 if (op.tokentype == 'DIV'):
                     Parser.tokens.selectNext()
