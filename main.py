@@ -31,7 +31,6 @@ class Node:
 
 class BinOp (Node):
     def Evaluate(self):
-        print('binop', self.value)
         allowed_operators={
             "+": operator.add,
             "-": operator.sub,
@@ -68,7 +67,6 @@ class NoOp(Node):
 class Tokenizer:
     def __init__(self, origin):
         self.origin = PrePro.removeComments(origin)
-        print(self.origin)
         self.position = 0
         self.actual = Token('EOF', 'EOF')
         self.selectNext()
@@ -91,7 +89,6 @@ class Tokenizer:
             self.actual = Token('INT', token)
 
         else:
-            print(self.origin[self.position])
             if (not self.origin[self.position].isdigit()):
                 token += self.origin[self.position]
                 self.position += 1
