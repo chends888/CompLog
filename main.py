@@ -12,32 +12,13 @@ class PrePro:
     def removeComments(origin):
         flag = False
         procorigin = ''
-        i = 0
-        while i < len(origin):
-            if (i < len(origin)-1):
-                if (origin[i] == "'"):
-                    flag = not flag
-                    i += 1
-                    continue
-                if (origin[i] + origin[i+1] == '\\n'):
-                    flag = not flag
-                    i += 2
-                    continue
-                if (flag):
-                    i += 1
-                    continue
-                procorigin += origin[i]
-                i += 1
-            else:
-                if (origin[i] == "'"):
-                    flag = not flag
-                    i += 1
-                    continue
-                if (flag):
-                    i += 1
-                    continue
-                procorigin += origin[i]
-                i += 1
+        for i in origin:
+            if (i == "'" or i == '\n'):
+                flag = not flag
+                continue
+            if (flag):
+                continue
+            procorigin += i
         return procorigin
 
 
@@ -82,8 +63,6 @@ class IntVal(Node):
 
 class NoOp(Node):
     pass
-
-
 
 
 class Tokenizer:
@@ -171,35 +150,29 @@ class Parser:
 
     def termExpression():
         factor1 = Parser.factorExpression()
-        # print(factor1.value)
         op = Parser.tokens.actual
         termop = factor1
 
         while (op.tokentype == 'DIV' or op.tokentype == 'MULT'):
             termop = BinOp(op.tokenvalue, [termop])
-            # print(termop.value)
             Parser.tokens.selectNext()
             factor2 = Parser.factorExpression()
             termop.children.append(factor2)
             op = Parser.tokens.actual
-        # print(termop.value)
         return termop
 
     @staticmethod
     def parserExpression():
         term1 = Parser.termExpression()
-        # print(term1.value)
         op = Parser.tokens.actual
         parserop = term1
 
         while (op.tokentype == 'PLUS' or op.tokentype == 'MINUS'):
             parserop = BinOp(op.tokenvalue, [parserop])
-            # print(parserop.value)
             Parser.tokens.selectNext()
             term2 = Parser.termExpression()
             parserop.children.append(term2)
             op = Parser.tokens.actual
-        # print(parserop.children[0].value, parserop.children[1].value)
         return parserop
 
     def run(code):
@@ -214,18 +187,8 @@ class Parser:
 
 '''Rotina de Testes'''
 
-# while True:
-    # print('\nType a math operation (+, -, * and // allowed):')
-    # test = input()
-
 with open('test.vbs', 'r', encoding='utf-8') as infile:
     lines = []
     for line in infile:
-        lines.append(line.rstrip('\n'))
-        # for i in line:
-            # print(i)
-            # if (i == '\n'):
-                # print('n')
-
-# print(lines[0])
+        lines.append(line)
 print('\nResult:', (Parser.run(lines[0]).Evaluate()))
