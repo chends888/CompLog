@@ -89,6 +89,7 @@ class NoOp(Node):
 class Tokenizer:
     def __init__(self, origin):
         self.origin = PrePro.removeComments(origin)
+        print(self.origin)
         self.position = 0
         self.actual = Token('EOF', 'EOF')
         self.selectNext()
@@ -111,6 +112,7 @@ class Tokenizer:
             self.actual = Token('INT', token)
 
         else:
+            print(self.origin[self.position])
             if (not self.origin[self.position].isdigit()):
                 token += self.origin[self.position]
                 self.position += 1
@@ -210,8 +212,20 @@ class Parser:
 
 
 
-# Testes
-while True:
-    print('\nType a math operation (+, -, * and // allowed):')
-    test = input()
-    print('\nResult:', (Parser.run(test).Evaluate()))
+'''Rotina de Testes'''
+
+# while True:
+    # print('\nType a math operation (+, -, * and // allowed):')
+    # test = input()
+
+with open('test.vbs', 'r', encoding='utf-8') as infile:
+    lines = []
+    for line in infile:
+        lines.append(line.rstrip('\n'))
+        # for i in line:
+            # print(i)
+            # if (i == '\n'):
+                # print('n')
+
+# print(lines[0])
+print('\nResult:', (Parser.run(lines[0]).Evaluate()))
