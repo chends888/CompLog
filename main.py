@@ -42,19 +42,43 @@ class PrePro:
 
 
 class Node:
-    def __init__(self, value, nodes=False):
+    def __init__(self, value=False, nodes=[]):
         self.value = value
         self.children = nodes
-    # def Evaluate():
+    def Evaluate(self):
+        pass
 
 class BinOp (Node):
-    pass
+    def Evaluate(self):
+        print('binop', self.value)
+        allowed_operators={
+            "+": operator.add,
+            "-": operator.sub,
+            "*": operator.mul,
+            "//": operator.floordiv
+        }
+
+        child1 = self.children[0]
+        child1 = child1.Evaluate()
+
+        child2 = self.children[1]
+        child2 = child2.Evaluate()
+        return allowed_operators[self.value](child1, child2)
+
 
 class UnOp(Node):
-    pass
+    def Evaluate(self):
+        child = self.children[0]
+        child = child.Evaluate()
+        if (self.value == '-'):
+            return -child
+        elif (self.value == '+'):
+            return +child
+
 
 class IntVal(Node):
-    pass
+    def Evaluate(self):
+        return self.value
 
 class NoOp(Node):
     pass
@@ -122,11 +146,11 @@ class Parser:
         elif (token1.tokentype == 'PLUS' or token1.tokentype == 'MINUS'):
             if (token1.tokentype == 'PLUS'):
                 Parser.tokens.selectNext()
-                unop = UnOp('+', Parser.factorExpression())
+                unop = UnOp('+', [Parser.factorExpression()])
                 return unop
             elif (token1.tokentype == 'MINUS'):
                 Parser.tokens.selectNext()
-                unop = UnOp('-', Parser.factorExpression())
+                unop = UnOp('-', [Parser.factorExpression()])
                 return unop
             else:
                 raise SyntaxError('Unexpected unary operation %s' %(token1.tokenvalue))
@@ -144,71 +168,41 @@ class Parser:
 
 
     def termExpression():
-        # allowed_operators={
-        #     "*": operator.mul,
-        #     "//": operator.floordiv
-        # }
         factor1 = Parser.factorExpression()
+        # print(factor1.value)
         op = Parser.tokens.actual
+        termop = factor1
 
-        mulop = BinOp(op.tokenvalue, [factor1])
-        divop = BinOp(op.tokenvalue, [factor1])
-        if (op.tokentype == 'DIV'):
-            while (op.tokentype == 'DIV'):
-                Parser.tokens.selectNext()
-                factor2 = Parser.factorExpression()
-                mulop.children.append(factor2)
-                op = Parser.tokens.actual
-            return mulop
-        if (op.tokentype == 'MULT'):
-            while (op.tokentype == 'MULT'):
-                Parser.tokens.selectNext()
-                factor2 = Parser.factorExpression()
-                divop.children.append(factor2)
-                op = Parser.tokens.actual
-            return divop
-        return factor1
+        while (op.tokentype == 'DIV' or op.tokentype == 'MULT'):
+            termop = BinOp(op.tokenvalue, [termop])
+            # print(termop.value)
+            Parser.tokens.selectNext()
+            factor2 = Parser.factorExpression()
+            termop.children.append(factor2)
+            op = Parser.tokens.actual
+        # print(termop.value)
+        return termop
 
     @staticmethod
     def parserExpression():
-        # allowed_operators={
-        #     "+": operator.add,
-        #     "-": operator.sub
-        # }
         term1 = Parser.termExpression()
+        # print(term1.value)
         op = Parser.tokens.actual
+        parserop = term1
 
-        # while (op.tokentype == 'PLUS' or op.tokentype == 'MINUS'):
-        #     Parser.tokens.selectNext()
-        #     term2 = Parser.termExpression()
-        #     term1 = allowed_operators[op.tokenvalue](term1, term2)
-        #     op = Parser.tokens.actual
-        # return term1
-
-
-
-        plusop = BinOp(op.tokenvalue, [term1])
-        minusop = BinOp(op.tokenvalue, [term1])
-        if (op.tokentype == 'PLUS'):
-            while (op.tokentype == 'PLUS'):
-                Parser.tokens.selectNext()
-                term2 = Parser.termExpression()
-                plusop.children.append(tefactor2rm2)
-                op = Parser.tokens.actual
-            return plusop
-        print('+-', op.tokentype)
-        if (op.tokentype == 'MINUS'):
-            while (op.tokentype == 'MINUS'):
-                Parser.tokens.selectNext()
-                term2 = Parser.termExpression()
-                minusop.children.append(term2)
-                op = Parser.tokens.actual
-            return minusop
+        while (op.tokentype == 'PLUS' or op.tokentype == 'MINUS'):
+            parserop = BinOp(op.tokenvalue, [parserop])
+            # print(parserop.value)
+            Parser.tokens.selectNext()
+            term2 = Parser.termExpression()
+            parserop.children.append(term2)
+            op = Parser.tokens.actual
+        # print(parserop.children[0].value, parserop.children[1].value)
+        return parserop
 
     def run(code):
         Parser.tokens = Tokenizer(code)
         result = Parser.parserExpression()
-        return result.children
         if (Parser.tokens.actual.tokentype == 'EOF'):
             return result
         else:
@@ -220,4 +214,4 @@ class Parser:
 while True:
     print('\nType a math operation (+, -, * and // allowed):')
     test = input()
-    print('\nResult:', Parser.run(test))
+    print('\nResult:', (Parser.run(test).Evaluate()))
