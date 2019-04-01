@@ -31,20 +31,19 @@ class Node:
 
 class BinOp (Node):
     def Evaluate(self):
+        # https://stackoverflow.com/questions/18591778/how-to-pass-an-operator-to-a-python-function
         allowed_operators={
             "+": operator.add,
             "-": operator.sub,
             "*": operator.mul,
             "//": operator.floordiv
         }
-
         child1 = self.children[0]
         child1 = child1.Evaluate()
 
         child2 = self.children[1]
         child2 = child2.Evaluate()
         return allowed_operators[self.value](child1, child2)
-
 
 class UnOp(Node):
     def Evaluate(self):
@@ -55,14 +54,12 @@ class UnOp(Node):
         elif (self.value == '+'):
             return +child
 
-
 class IntVal(Node):
     def Evaluate(self):
         return self.value
 
 class NoOp(Node):
     pass
-
 
 class Tokenizer:
     def __init__(self, origin):
@@ -88,6 +85,17 @@ class Tokenizer:
                     break
             self.actual = Token('INT', token)
 
+        elif (self.origin[self.position].isalpha()):
+            while (self.origin[self.position].isalpha()):
+                token += self.origin[self.position]
+                self.position += 1
+                if (self.position == (len(self.origin))):
+                    break
+            if (token == 'print'):
+                self.actual = Token('COMM', token)
+            else:
+                self.actual = Token('IDENT', token)
+
         else:
             if (not self.origin[self.position].isdigit()):
                 token += self.origin[self.position]
@@ -103,11 +111,17 @@ class Tokenizer:
             elif (token == '//'):
                 self.actual = Token('DIV', token)
             elif (token == '('):
-                self.actual = Token('(', token)
+                self.actual = Token('PAR', token)
             elif (token == ')'):
-                self.actual = Token(')', token)
+                self.actual = Token('PAR', token)
+            elif (token == '='):
+                self.actual = Token('ASSIG', token)
+            elif (token == 'BEGIN'):
+                self.actual = Token('COMM', token)
+            elif (token == 'END'):
+                self.actual = Token('COMM', token)
             else:
-                raise ValueError('Unexpected operation %s' %(token))
+                raise ValueError('Unexpected token %s' %(token))
 
 
 class Parser:
@@ -132,10 +146,10 @@ class Parser:
                 return unop
             else:
                 raise SyntaxError('Unexpected unary operation %s' %(token1.tokenvalue))
-        elif (token1.tokentype == '('):
+        elif (token1.tokenvalue == '('):
             Parser.tokens.selectNext()
             expr = Parser.parserExpression()
-            if (Parser.tokens.actual.tokentype == ')'):
+            if (Parser.tokens.actual.tokenvalue == ')'):
                 Parser.tokens.selectNext()
                 return expr
             else:
@@ -171,6 +185,38 @@ class Parser:
             parserop.children.append(term2)
             op = Parser.tokens.actual
         return parserop
+
+    def statement():
+        Parser.tokens.selectNext()
+        actualtoken = Parser.tokens.actual
+
+        if (actualtoken.tokentype == 'COMM' and actualtoken.tokenvalue == 'print'):
+            result = Parser.parserExpression()
+            printtree = UnOp('print', [result])
+        elif (actualtoken.tokentype == 'IDENT'):
+            ident = actualtoken
+            Parser.tokens.selectNext()
+            if (Parser.tokens.actual.tokentype == 'ASSIG'):
+                result = Parser.parserExpression()
+                assigtree = UnOp('assig', [ident, result])
+            else:
+                raise ValueError('Expected assignment symbol "=", got %s', %(Parser.tokens.actual.tokenvalue))
+        elif (actualtoken.tokentype == 'COMM' and actualtoken.tokenvalue == 'BEGIN'):
+            Parser.statements()
+        else:
+            pass
+
+    def statements():
+        if (Parser.tokens.actual.tokenvalue == 'BEGIN'):
+            Parser.tokens.selectNext()
+            if (Parser.tokens.actual.tokenvalue == '\n'):
+                while (Parser.tokens.actual.tokenvalue != 'END'):
+                    Parser.statement()
+                    Parser.tokens.selectNext()
+                    if (Parser.tokens.actual.tokenvalue != '\n'):
+                        raise SyntaxError('End line after statement token not found')
+            else:
+                raise SyntaxError('End line after BEGIN token not found')
 
     def run(code):
         Parser.tokens = Tokenizer(code)
