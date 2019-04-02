@@ -13,9 +13,11 @@ class PrePro:
         flag = False
         procorigin = ''
         for i in origin:
-            if (i == "'" or i == '\n'):
+            if (i == "'"):
                 flag = not flag
                 continue
+            if (i == '\n'):
+                flag = False
             if (flag):
                 continue
             procorigin += i
@@ -26,49 +28,64 @@ class Node:
     def __init__(self, value=False, nodes=[]):
         self.value = value
         self.children = nodes
-    def Evaluate(self):
+    def Evaluate(self, st):
         pass
 
 class BinOp (Node):
-    def Evaluate(self):
+    def Evaluate(self, st):
+        # https://stackoverflow.com/questions/18591778/how-to-pass-an-operator-to-a-python-function
         allowed_operators={
             "+": operator.add,
             "-": operator.sub,
             "*": operator.mul,
             "//": operator.floordiv
         }
-
         child1 = self.children[0]
-        child1 = child1.Evaluate()
+        child1 = child1.Evaluate(st)
 
         child2 = self.children[1]
-        child2 = child2.Evaluate()
+        child2 = child2.Evaluate(st)
         return allowed_operators[self.value](child1, child2)
 
-
 class UnOp(Node):
-    def Evaluate(self):
+    def Evaluate(self, st):
         child = self.children[0]
-        child = child.Evaluate()
+        child = child.Evaluate(st)
         if (self.value == '-'):
             return -child
         elif (self.value == '+'):
             return +child
 
-
 class IntVal(Node):
-    def Evaluate(self):
-        return self.value
+    def Evaluate(self, st):
+        return int(self.value)
+
+class Identifier(Node):
+    def Evaluate(self, st):
+        return st.getter(self.value)
 
 class NoOp(Node):
     pass
 
+class Statements(Node):
+    def Evaluate(self, st):
+        for i in self.children:
+            i.Evaluate(st)
+
+class Assignment(Node):
+    def Evaluate(self, st):
+        st.setter(self.children[0], self.children[1].Evaluate(st))
+
+class Print(Node):
+    def Evaluate(self, st):
+        print(self.children[0].Evaluate(st))
 
 class Tokenizer:
     def __init__(self, origin):
         self.origin = PrePro.removeComments(origin)
         self.position = 0
         self.actual = Token('EOF', 'EOF')
+        self.reservedwords = ['PRINT', 'BEGIN', 'END']
         self.selectNext()
 
     def selectNext(self):
@@ -88,6 +105,19 @@ class Tokenizer:
                     break
             self.actual = Token('INT', token)
 
+        elif (self.origin[self.position].isalpha()):
+            while (self.origin[self.position].isalpha()):
+                token += self.origin[self.position]
+                self.position += 1
+                if (self.position == (len(self.origin))):
+                    break
+            token = token.upper()
+
+            if (token in self.reservedwords):
+                self.actual = Token('COMM', token)
+            else:
+                self.actual = Token('IDENT', token)
+
         else:
             if (not self.origin[self.position].isdigit()):
                 token += self.origin[self.position]
@@ -103,15 +133,29 @@ class Tokenizer:
             elif (token == '//'):
                 self.actual = Token('DIV', token)
             elif (token == '('):
-                self.actual = Token('(', token)
+                self.actual = Token('PAR', token)
             elif (token == ')'):
-                self.actual = Token(')', token)
+                self.actual = Token('PAR', token)
+            elif (token == '='):
+                self.actual = Token('ASSIG', token)
+            elif (token == '\n'):
+                self.actual = Token('ENDL', token)
             else:
-                raise ValueError('Unexpected operation %s' %(token))
+                raise ValueError('Unexpected token %s' %(token))
+        # print('Tokenizer token:', token)
+
+class SymbolTable:
+    def __init__(self):
+        self.symtabledict = {}
+
+    def getter(self, identifier):
+        return self.symtabledict[identifier]
+    def setter(self, identifier, value):
+        self.symtabledict[identifier] = value
+
 
 
 class Parser:
-
     def factorExpression():
         try:
             token1 = Parser.tokens.actual
@@ -119,7 +163,7 @@ class Parser:
             raise ValueError('Token not found')
         if (token1.tokentype == 'INT'):
             Parser.tokens.selectNext()
-            return IntVal(int(token1.tokenvalue))
+            return IntVal(token1.tokenvalue)
 
         elif (token1.tokentype == 'PLUS' or token1.tokentype == 'MINUS'):
             if (token1.tokentype == 'PLUS'):
@@ -130,19 +174,24 @@ class Parser:
                 Parser.tokens.selectNext()
                 unop = UnOp('-', [Parser.factorExpression()])
                 return unop
+
             else:
                 raise SyntaxError('Unexpected unary operation %s' %(token1.tokenvalue))
-        elif (token1.tokentype == '('):
+
+        elif (token1.tokentype == 'IDENT'):
+            Parser.tokens.selectNext()
+            return Identifier(token1.tokenvalue)
+
+        elif (token1.tokenvalue == '('):
             Parser.tokens.selectNext()
             expr = Parser.parserExpression()
-            if (Parser.tokens.actual.tokentype == ')'):
+            if (Parser.tokens.actual.tokenvalue == ')'):
                 Parser.tokens.selectNext()
                 return expr
             else:
                 raise SyntaxError('Unexpected token  %s, expected ")"' %(Parser.tokens.actual.tokenvalue))
-
         else:
-            raise SyntaxError('Invalid token, element %s is not INT' %(token1.tokentype))
+            raise SyntaxError('Invalid token, element %s is not INT' %(token1.tokenvalue))
 
 
     def termExpression():
@@ -172,9 +221,59 @@ class Parser:
             op = Parser.tokens.actual
         return parserop
 
+    def statement():
+        actualtoken = Parser.tokens.actual
+
+        if (actualtoken.tokentype == 'COMM' and actualtoken.tokenvalue == 'PRINT'):
+            Parser.tokens.selectNext()
+            result = Parser.parserExpression()
+            printtree = Print('PRINT', [result])
+            return printtree
+        elif (actualtoken.tokentype == 'IDENT'):
+            ident = actualtoken
+            Parser.tokens.selectNext()
+            if (Parser.tokens.actual.tokentype == 'ASSIG'):
+                Parser.tokens.selectNext()
+                result = Parser.parserExpression()
+                assigtree = Assignment('assig', [ident.tokenvalue, result])
+                return assigtree
+            else:
+                raise ValueError('Expected assignment symbol "=", got %s' %(Parser.tokens.actual.tokenvalue))
+        elif (actualtoken.tokentype == 'COMM' and actualtoken.tokenvalue == 'BEGIN'):
+            return Parser.statements()
+        else:
+            return NoOp()
+
+    def statements():
+        statements = []
+        if (Parser.tokens.actual.tokenvalue == 'BEGIN'):
+            Parser.tokens.selectNext()
+            if (Parser.tokens.actual.tokenvalue == '\n'):
+                Parser.tokens.selectNext()
+                while (Parser.tokens.actual.tokenvalue != 'END'):
+                    statements.append(Parser.statement())
+                    # print('oken value:', Parser.tokens.actual.tokenvalue)
+                    if (Parser.tokens.actual.tokenvalue == '\n'):
+                        Parser.tokens.selectNext()
+                    else:
+                        raise SyntaxError('End line after statement token not found')
+                Parser.tokens.selectNext()
+                if (Parser.tokens.actual.tokenvalue == '\n'):
+                    # Parser.tokens.selectNext()
+                    # print('return1')
+                    return Statements('statements', statements)
+                else:
+                    raise SyntaxError('Statement end token "END" not found')
+            else:
+                raise SyntaxError('End line after BEGIN token not found')
+        else:
+            raise SyntaxError('Unexpected BEGIN token %s' %(Parser.tokens.actual.tokenvalue))
+
+
     def run(code):
         Parser.tokens = Tokenizer(code)
-        result = Parser.parserExpression()
+        result = Parser.statements()
+        Parser.tokens.selectNext()
         if (Parser.tokens.actual.tokentype == 'EOF'):
             return result
         else:
@@ -185,7 +284,7 @@ class Parser:
 '''Rotina de Testes'''
 
 with open('test.vbs', 'r', encoding='utf-8') as infile:
-    lines = []
-    for line in infile:
-        lines.append(line)
-print('\nResult:', (Parser.run(lines[0]).Evaluate()))
+    lines = infile.read()
+
+st = SymbolTable()
+Parser.run(lines).Evaluate(st)
