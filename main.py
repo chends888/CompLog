@@ -94,11 +94,8 @@ class Tokenizer:
             self.position += 1
 
         token = ''
-        if (self.position >= (len(self.origin))):
-            self.actual = Token('EOF', 'EOF')
-            return
 
-        elif (self.origin[self.position].isdigit()):
+        if (self.origin[self.position].isdigit()):
             while (self.origin[self.position].isdigit()):
                 token += self.origin[self.position]
                 self.position += 1
@@ -139,6 +136,10 @@ class Tokenizer:
                 self.actual = Token('ENDL', token)
             else:
                 raise ValueError('Unexpected token %s' %(token))
+
+        if (self.position >= (len(self.origin))):
+            self.actual = Token('EOF', 'EOF')
+            return
 
 class SymbolTable:
     def __init__(self):
@@ -252,15 +253,8 @@ class Parser:
                         Parser.tokens.selectNext()
                     else:
                         raise SyntaxError('End line after statement token not found')
-                if (Parser.tokens.actual.tokenvalue == 'END'):
-                    Parser.tokens.selectNext()
-                    if (Parser.tokens.actual.tokenvalue == '\n'):
-                        Parser.tokens.selectNext()
-                        return Statements('statements', statements)
-                    else:
-                        raise SyntaxError('End line token not found')
-                else:
-                    raise SyntaxError('Statement end token "END" not found')
+                Parser.tokens.selectNext()
+                return Statements('statements', statements)
             else:
                 raise SyntaxError('End line after BEGIN token not found')
         else:
