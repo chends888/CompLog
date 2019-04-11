@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import operator
+import sys
 
 class Token:
     def __init__(self, tokentype, tokenvalue):
@@ -101,16 +102,12 @@ class Tokenizer:
             while (self.origin[self.position].isdigit()):
                 token += self.origin[self.position]
                 self.position += 1
-                if (self.position == (len(self.origin))):
-                    break
             self.actual = Token('INT', token)
 
         elif (self.origin[self.position].isalpha()):
             while (self.origin[self.position].isalpha()):
                 token += self.origin[self.position]
                 self.position += 1
-                if (self.position == (len(self.origin))):
-                    break
             token = token.upper()
 
             if (token in self.reservedwords):
@@ -142,7 +139,6 @@ class Tokenizer:
                 self.actual = Token('ENDL', token)
             else:
                 raise ValueError('Unexpected token %s' %(token))
-        # print('Tokenizer token:', token)
 
 class SymbolTable:
     def __init__(self):
@@ -252,16 +248,17 @@ class Parser:
                 Parser.tokens.selectNext()
                 while (Parser.tokens.actual.tokenvalue != 'END'):
                     statements.append(Parser.statement())
-                    # print('oken value:', Parser.tokens.actual.tokenvalue)
                     if (Parser.tokens.actual.tokenvalue == '\n'):
                         Parser.tokens.selectNext()
                     else:
                         raise SyntaxError('End line after statement token not found')
-                Parser.tokens.selectNext()
-                if (Parser.tokens.actual.tokenvalue == '\n'):
-                    # Parser.tokens.selectNext()
-                    # print('return1')
-                    return Statements('statements', statements)
+                if (Parser.tokens.actual.tokenvalue == 'END'):
+                    Parser.tokens.selectNext()
+                    if (Parser.tokens.actual.tokenvalue == '\n'):
+                        Parser.tokens.selectNext()
+                        return Statements('statements', statements)
+                    else:
+                        raise SyntaxError('End line token not found')
                 else:
                     raise SyntaxError('Statement end token "END" not found')
             else:
@@ -273,7 +270,6 @@ class Parser:
     def run(code):
         Parser.tokens = Tokenizer(code)
         result = Parser.statements()
-        Parser.tokens.selectNext()
         if (Parser.tokens.actual.tokentype == 'EOF'):
             return result
         else:
@@ -283,7 +279,7 @@ class Parser:
 
 '''Rotina de Testes'''
 
-with open('test.vbs', 'r', encoding='utf-8') as infile:
+with open(sys.argv[1], 'r', encoding='utf-8') as infile:
     lines = infile.read()
 
 st = SymbolTable()
