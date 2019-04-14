@@ -39,7 +39,10 @@ class BinOp (Node):
             "+": operator.add,
             "-": operator.sub,
             "*": operator.mul,
-            "//": operator.floordiv
+            "//": operator.floordiv,
+            "=": operator.eq,
+            ">": operator.gt,
+            "<": operator.lt
         }
         child1 = self.children[0]
         child1 = child1.Evaluate(st)
@@ -70,8 +73,11 @@ class NoOp(Node):
 
 class Statements(Node):
     def Evaluate(self, st):
+        a = 0
         for i in self.children:
+            print('a', a)
             i.Evaluate(st)
+            a+=a
 
 class Assignment(Node):
     def Evaluate(self, st):
@@ -81,28 +87,45 @@ class Print(Node):
     def Evaluate(self, st):
         print(self.children[0].Evaluate(st))
 
+class While(Node):
+    def Evaluate(self, st):
+        while (self.children[0].Evaluate(st)):
+            self.children[1].Evaluate(st)
+
+class If(Node):
+    def Evaluate(self, st):
+        if (self.children[0].Evaluate(st)):
+            self.children[1].Evaluate(st)
+        elif (len(self.children) == 3):
+            self.children[2].Evaluate(st)
+
+
 class Tokenizer:
     def __init__(self, origin):
         self.origin = PrePro.removeComments(origin)
         self.position = 0
         self.actual = Token('EOF', 'EOF')
-        self.reservedwords = ['PRINT', 'BEGIN', 'END']
+        self.reservedwords = ['PRINT', 'IF', 'WHILE', 'THEN', 'ELSE', 'WEND']
         self.selectNext()
 
     def selectNext(self):
         while (self.position < len(self.origin) and self.origin[self.position] == ' '):
             self.position += 1
 
+        if (self.position >= (len(self.origin))):
+            self.actual = Token('EOF', 'EOF')
+            return
+
         token = ''
 
         if (self.origin[self.position].isdigit()):
-            while (self.origin[self.position].isdigit()):
+            while (self.position < (len(self.origin)) and self.origin[self.position].isdigit()):
                 token += self.origin[self.position]
                 self.position += 1
             self.actual = Token('INT', token)
 
         elif (self.origin[self.position].isalpha()):
-            while (self.origin[self.position].isalpha()):
+            while (self.position < (len(self.origin)) and self.origin[self.position].isalpha()):
                 token += self.origin[self.position]
                 self.position += 1
             token = token.upper()
@@ -136,10 +159,9 @@ class Tokenizer:
                 self.actual = Token('ENDL', token)
             else:
                 raise ValueError('Unexpected token %s' %(token))
+        print(token, self.actual.tokentype, self.position, len(self.origin))
 
-        if (self.position >= (len(self.origin))):
-            self.actual = Token('EOF', 'EOF')
-            return
+
 
 class SymbolTable:
     def __init__(self):
@@ -153,9 +175,11 @@ class SymbolTable:
 
 
 class Parser:
+    @staticmethod
     def factorExpression():
         try:
             token1 = Parser.tokens.actual
+            # print('token1:', token1.tokenvalue)
         except:
             raise ValueError('Token not found')
         if (token1.tokentype == 'INT'):
@@ -190,7 +214,7 @@ class Parser:
         else:
             raise SyntaxError('Invalid token, element %s is not INT' %(token1.tokenvalue))
 
-
+    @staticmethod
     def termExpression():
         factor1 = Parser.factorExpression()
         op = Parser.tokens.actual
@@ -218,47 +242,86 @@ class Parser:
             op = Parser.tokens.actual
         return parserop
 
+    @staticmethod
     def statement():
-        actualtoken = Parser.tokens.actual
 
-        if (actualtoken.tokentype == 'COMM' and actualtoken.tokenvalue == 'PRINT'):
-            Parser.tokens.selectNext()
-            result = Parser.parserExpression()
-            printtree = Print('PRINT', [result])
-            return printtree
-        elif (actualtoken.tokentype == 'IDENT'):
-            ident = actualtoken
+        if (Parser.tokens.actual.tokentype == 'COMM'):
+            if (Parser.tokens.actual.tokenvalue == 'PRINT'):
+                Parser.tokens.selectNext()
+                result = Parser.parserExpression()
+                printtree = Print('PRINT', [result])
+                return printtree
+            elif (Parser.tokens.actual.tokenvalue == 'IF'):
+                Parser.tokens.selectNext()
+                iftree = If('IF',[])
+                testexp = Parser.relExpression()
+                iftree.children.append(testexp)
+                if (Parser.tokens.actual.tokenvalue == 'THEN'):
+                    print('then')
+                    Parser.tokens.selectNext()
+                    ifstmts = Parser.statements()
+                    iftree.children.append(ifstmts)
+                    # Parser.tokens.selectNext()
+                if (Parser.tokens.actual.tokenvalue == 'ELSE'):
+                    elsestmts = Parser.statements()
+                    iftree.children.append(elsestmts)
+                    Parser.tokens.selectNext()
+                print('endif:', Parser.tokens.actual.tokenvalue)
+                if (Parser.tokens.actual.tokenvalue == 'END'):
+                    print('end')
+                    Parser.tokens.selectNext()
+                if (Parser.tokens.actual.tokenvalue == 'IF'):
+                    print('step3')
+                    Parser.tokens.selectNext()
+                    return iftree
+            elif (Parser.tokens.actual.tokenvalue == 'WHILE'):
+                whiletree = While('WHILE', [])
+                Parser.tokens.selectNext()
+                testexp = Parser.relExpression()
+                whiletree.children.append(testexp)
+                whilestmts = Parser.statements()
+                whiletree.children.append(whilestmts)
+                return whiletree
+        elif (Parser.tokens.actual.tokentype == 'IDENT'):
+            ident = Parser.tokens.actual
             Parser.tokens.selectNext()
             if (Parser.tokens.actual.tokentype == 'ASSIG'):
                 Parser.tokens.selectNext()
                 result = Parser.parserExpression()
-                assigtree = Assignment('assig', [ident.tokenvalue, result])
+                assigtree = Assignment('ASSIG', [ident.tokenvalue, result])
+                print('step2')
                 return assigtree
             else:
                 raise ValueError('Expected assignment symbol "=", got %s' %(Parser.tokens.actual.tokenvalue))
-        elif (actualtoken.tokentype == 'COMM' and actualtoken.tokenvalue == 'BEGIN'):
-            return Parser.statements()
         else:
             return NoOp()
 
+    @staticmethod
     def statements():
         statements = []
-        if (Parser.tokens.actual.tokenvalue == 'BEGIN'):
+
+        print('step1')
+        statements.append(Parser.statement())
+        while (Parser.tokens.actual.tokenvalue == '\n'):
             Parser.tokens.selectNext()
-            if (Parser.tokens.actual.tokenvalue == '\n'):
-                Parser.tokens.selectNext()
-                while (Parser.tokens.actual.tokenvalue != 'END'):
-                    statements.append(Parser.statement())
-                    if (Parser.tokens.actual.tokenvalue == '\n'):
-                        Parser.tokens.selectNext()
-                    else:
-                        raise SyntaxError('End line after statement token not found')
-                Parser.tokens.selectNext()
-                return Statements('statements', statements)
-            else:
-                raise SyntaxError('End line after BEGIN token not found')
-        else:
-            raise SyntaxError('Unexpected BEGIN token %s' %(Parser.tokens.actual.tokenvalue))
+            statements.append(Parser.statement())
+        # Parser.tokens.selectNext()
+        return Statements('STATEMENTS', statements)
+
+
+    @staticmethod
+    def relExpression():
+        var1 = Parser.parserExpression()
+        op = Parser.tokens.actual
+        print('op', op.tokenvalue)
+        relop = BinOp(op.tokenvalue, [var1])
+        print('var', Parser.tokens.actual.tokenvalue)
+        Parser.tokens.selectNext()
+        var2 = Parser.parserExpression()
+        relop.children.append(var2)
+        return relop
+
+
 
 
     def run(code):

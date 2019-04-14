@@ -1,5 +1,2 @@
-BEGIN
-x = 10*(2)
-'wscqcwnjkl
-print x
-END
+x = 10*2
+if x=20 then print x end if
