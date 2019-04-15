@@ -157,6 +157,10 @@ class Tokenizer:
                 self.actual = Token('ASSIG', token)
             elif (token == '\n'):
                 self.actual = Token('ENDL', token)
+            elif (token == '<'):
+                self.actual = Token('LESS', token)
+            elif (token == '>'):
+                self.actual = Token('GREATER', token)
             else:
                 raise ValueError('Unexpected token %s' %(token))
         print(token, self.actual.tokentype, self.position, len(self.origin))
@@ -250,6 +254,7 @@ class Parser:
                 Parser.tokens.selectNext()
                 result = Parser.parserExpression()
                 printtree = Print('PRINT', [result])
+                print('printtree')
                 return printtree
             elif (Parser.tokens.actual.tokenvalue == 'IF'):
                 Parser.tokens.selectNext()
@@ -263,6 +268,8 @@ class Parser:
                     iftree.children.append(ifstmts)
                     # Parser.tokens.selectNext()
                 if (Parser.tokens.actual.tokenvalue == 'ELSE'):
+                    print('else')
+                    Parser.tokens.selectNext()
                     elsestmts = Parser.statements()
                     iftree.children.append(elsestmts)
                     Parser.tokens.selectNext()
@@ -271,17 +278,23 @@ class Parser:
                     print('end')
                     Parser.tokens.selectNext()
                 if (Parser.tokens.actual.tokenvalue == 'IF'):
-                    print('step3')
                     Parser.tokens.selectNext()
                     return iftree
             elif (Parser.tokens.actual.tokenvalue == 'WHILE'):
-                whiletree = While('WHILE', [])
                 Parser.tokens.selectNext()
+                whiletree = While('WHILE', [])
                 testexp = Parser.relExpression()
                 whiletree.children.append(testexp)
-                whilestmts = Parser.statements()
-                whiletree.children.append(whilestmts)
-                return whiletree
+                if (Parser.tokens.actual.tokenvalue == '\n'):
+                    whilestmts = Parser.statements()
+                    whiletree.children.append(whilestmts)
+                    # Parser.tokens.selectNext()
+                if (Parser.tokens.actual.tokenvalue == 'WEND'):
+                    print('WEND')
+                    Parser.tokens.selectNext()
+                    print('wend', Parser.tokens.actual.tokenvalue)
+                    return whiletree
+            
         elif (Parser.tokens.actual.tokentype == 'IDENT'):
             ident = Parser.tokens.actual
             Parser.tokens.selectNext()
@@ -315,8 +328,8 @@ class Parser:
         op = Parser.tokens.actual
         print('op', op.tokenvalue)
         relop = BinOp(op.tokenvalue, [var1])
-        print('var', Parser.tokens.actual.tokenvalue)
         Parser.tokens.selectNext()
+        print('var', Parser.tokens.actual.tokenvalue)
         var2 = Parser.parserExpression()
         relop.children.append(var2)
         return relop
