@@ -4,15 +4,21 @@ Repository for the Computer Logic course. Building a compiler from scratch
 
 Compiler EBNF:
 
-statements = "Begin", "\n", statement, "\n", { statement, "\n" }, "End" ;
+statements = statement, "\n", { statement, "\n" };
 
-statement = assignment | print | statements ;
+statement = assignment | print | statements | while | if ;
 
-assignment = identifier, "=", expression ;
+assignment = identifier, "=", (expression, "input") ;
 
 print = "print", expression ;
 
-expression = term, { ("+" | "-"), term } ;
+while = "while", relexpression, "\n", statements, "\n", "WEND" ;
+
+if = "if", relexpression, "\n", "then", statements, {"else", statements}, "end if" ;
+
+relexpression = expression, {">", "<", "="},  expression
+
+expression = term, { ("+" | "-" | ">" | "<" | "="), term } ;
 
 term = fator, { ("*" | "/"), fator } ;
 
