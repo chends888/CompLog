@@ -1,5 +1,11 @@
-x = 10*2
-if x=2 then print x else print 1 end if
-while x<22
-print x
-x = x+1 wend
+x = input
+y = 0
+if x<5 then
+    print x
+else
+    print y
+end if
+while x<10
+    print x
+    x = x+1
+wend
