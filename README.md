@@ -20,9 +20,9 @@ relexpression = expression, {">", "<", "="},  expression
 
 expression = term, { ("+" | "-" | ">" | "<" | "="), term } ;
 
-term = fator, { ("*" | "/"), fator } ;
+term = factor, { ("*" | "/"), factor } ;
 
-fator = ("+" | "-"), fator | num | "(", expression, ")" | identifier ;
+factor = ("+" | "-"), factor | num | "(", expression, ")" | identifier ;
 
 identifier = letter, { letter | digit | "_" } ;
 
@@ -31,3 +31,5 @@ num = digit, { digit } ;
 letter = ( a | ... | z | A | ... | Z ) ;
 
 digit = ( 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 0 ) ;
+
+
