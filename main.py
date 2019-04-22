@@ -176,8 +176,6 @@ class SymbolTable:
     def setter(self, identifier, value):
         self.symtabledict[identifier] = value
 
-
-
 class Parser:
     @staticmethod
     def factorExpression():
@@ -206,9 +204,11 @@ class Parser:
 
         elif (token1.tokenvalue == '('):
             Parser.tokens.selectNext()
+            parexpr = Parser.parserExpression()
+
             if (Parser.tokens.actual.tokenvalue == ')'):
                 Parser.tokens.selectNext()
-                return Parser.parserExpression()
+                return parexpr
             else:
                 raise SyntaxError('Unexpected token  %s, expected ")"' %(Parser.tokens.actual.tokenvalue))
         elif (token1.tokenvalue == 'INPUT'):
@@ -221,7 +221,7 @@ class Parser:
     def termExpression():
         termop = Parser.factorExpression()
         while (Parser.tokens.actual.tokentype == 'DIV' or Parser.tokens.actual.tokentype == 'MULT'):
-            termop = BinOp(Parser.tokens.actual.tokenvalue, [Parser.factorExpression()])
+            termop = BinOp(Parser.tokens.actual.tokenvalue, [termop])
             Parser.tokens.selectNext()
             factor2 = Parser.factorExpression()
             termop.children.append(factor2)
