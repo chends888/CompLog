@@ -293,7 +293,7 @@ class Parser:
                     if (Parser.tokens.actual.tokenvalue == '\n'):
                         while (Parser.tokens.actual.tokenvalue == '\n'):
                             Parser.tokens.selectNext()
-                            if (Parser.tokens.actual.tokenvalue not in ['ELSE']):
+                            if (Parser.tokens.actual.tokenvalue not in ['ELSE', 'END']):
                                 thentree.children.append(Parser.statement())
                     else:
                         raise SyntaxError('Expected endline token, got %s' %(Parser.tokens.actual.tokenvalue))
@@ -318,8 +318,13 @@ class Parser:
                                 raise SyntaxError('Expected "IF" token, got %s' %(Parser.tokens.actual.tokenvalue))
                         else:
                             raise SyntaxError('Expected "END" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                    elif (Parser.tokens.actual.tokenvalue == 'END'):
+                        Parser.tokens.selectNext()
+                        if (Parser.tokens.actual.tokenvalue == 'IF'):
+                            Parser.tokens.selectNext()
+                            return iftree
                     else:
-                        raise SyntaxError('Expected "ELSE" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                        raise SyntaxError('Expected "ELSE" or "END" token, got %s' %(Parser.tokens.actual.tokenvalue))
                 else:
                     raise SyntaxError('Expected "THEN" token, got %s' %(Parser.tokens.actual.tokenvalue))
             elif (Parser.tokens.actual.tokenvalue == 'WHILE'):
