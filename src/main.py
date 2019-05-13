@@ -139,7 +139,7 @@ class While(Node):
 
 class If(Node):
     def Evaluate(self, st):
-        if (self.children[0].Evaluate(st)):
+        if (self.children[0].Evaluate(st)[0]):
             self.children[1].Evaluate(st)
         elif (len(self.children) == 3):
             self.children[2].Evaluate(st)
@@ -148,6 +148,7 @@ class Input(Node):
     def Evaluate(self, st):
         # print('Input:')
         userinput = input('Input: ')
+        print('\n')
         try:
             userinput = int(userinput)
             return [userinput, 'INTEGER']

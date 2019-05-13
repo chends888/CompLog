@@ -10,17 +10,19 @@ Sub main()
     dim flag as boolean
 
     n = INPUT
-    fizz = 0000
-    buzz = 1111
-    fizzbuzz = 00001111
+    fizz = 10
+    buzz = 100
+    fizzbuzz = 1000
     flag = True
 
     while n > 0
         tres = (n - (n / 3 * 3))
         cinco = (n - (n / 5 * 5))
 
-        print n
 
+        ' print tres=0
+        ' print cinco=0
+        print n
         if (tres = 0) and (cinco = 0) then
             print fizzbuzz
             flag = False

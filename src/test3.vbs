@@ -8,7 +8,7 @@ Sub main()
         print testeint + 10
     end if
 
-    while (testeint > 0) and testebool = True
+    while (testeint > 0) and (testebool = True)
         print testeint
         testeint = testeint - 1
     wend
