@@ -1,5 +1,5 @@
 # CompLog
-Repository for the Computer Logic course. Building a compiler from scratch
+Repository for the Computer Logic course. Building a compiler from scratch (using Python)
 
 
 ## EBNF:
