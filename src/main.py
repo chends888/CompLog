@@ -26,11 +26,17 @@ class PrePro:
         return procorigin
 
 class Node:
+    i = 0
     def __init__(self, value=False, nodes=[]):
         self.value = value
         self.children = nodes
+        self.id = Node.i
     def Evaluate(self, st):
         pass
+    @staticmethod
+    def newId():
+        Node.i += 1
+        return Node.i
 
 class BinOp (Node):
     def Evaluate(self, st):
