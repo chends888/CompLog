@@ -42,35 +42,54 @@ class BinOp (Node):
             "//": operator.floordiv,
             "=": operator.eq,
             ">": operator.gt,
-            "<": operator.lt
+            "<": operator.lt,
+            "OR": operator.or_,
+            "AND": operator.and_
         }
-        child1 = self.children[0]
-        child1 = child1.Evaluate(st)
-
-        child2 = self.children[1]
-        child2 = child2.Evaluate(st)
-        return allowed_operators[self.value](child1, child2)
+        child1 = self.children[0].Evaluate(st)
+        child2 = self.children[1].Evaluate(st)
+        child2val = child2[0]
+        child2type = child2[1]
+        if (child1[1] == 'INTEGER' and child2type == 'INTEGER' and self.value in ['+', '-', '*', '//']):
+            return [allowed_operators[self.value](child1[0], child2val), 'INTEGER']
+        elif (child1[1] == 'INTEGER' and child2type == 'INTEGER' and self.value in ['=', '>', '<']):
+            return [allowed_operators[self.value](child1[0], child2val), 'BOOLEAN']
+        elif (child1[1] == 'BOOLEAN' and child2type == 'BOOLEAN' and self.value in ['OR', 'AND', '=']):
+            return [allowed_operators[self.value](child1[0], child2val), 'BOOLEAN']
+        else:
+            print(child1)
+            print(child2)
+            raise ValueError('Operands type "%s" and "%s" does not match operation "%s"' %(child1[1], child2[1], self.value))
 
 class UnOp(Node):
     def Evaluate(self, st):
-        child = self.children[0]
-        child = child.Evaluate(st)
-        if (self.value == '-'):
-            return -child
-        elif (self.value == '+'):
-            return +child
+        child = self.children[0].Evaluate(st)
+        # print(child)
+        if (self.value in ['-', '+']):
+            if (child[1] == 'INTEGER'):
+                if (self.value == '+'):
+                    return [+child[0], 'INTEGER']
+                if (self.value == '-'):
+                    return [-child[0], 'INTEGER']
+            else:
+                raise ValueError('Operand type "%s" does not match operation "%s"' %(self.children[0].children[1].Evaluate(st), self.value))
+        elif (self.value == 'NOT'):
+            if (child[1] == 'BOOLEAN'):
+                return [not child[0], 'BOOLEAN']
+            else:
+                raise ValueError('Operand type "%s" does not match operation "%s"' %(self.children[0].children[1].Evaluate(st), self.value))
 
 class IntVal(Node):
     def Evaluate(self, st):
-        return int(self.value)
+        return [int(self.children[0]), self.children[1].Evaluate(st)]
 
 class BoolVal(Node):
     def Evaluate(self, st):
         # print('qqqqqqqq', self.value)
-        if (self.value == 'TRUE'):
-            return True
+        if (self.children[0] == 'TRUE'):
+            return [True, self.children[1].Evaluate(st)]
         else:
-            return False
+            return [False, self.children[1].Evaluate(st)]
 
 class Identifier(Node):
     def Evaluate(self, st):
@@ -91,22 +110,31 @@ class Statements(Node):
 
 class Assignment(Node):
     def Evaluate(self, st):
-        var1 = st.getteraux(self.children[0])
-        if (var1[1] == 'BOOLEAN' and self.children[1].Evaluate(st) in [False, True]):
-            st.setter(self.children[0], self.children[1].Evaluate(st), 'BOOLEAN')
-        elif (var1[1] == 'INTEGER' and str(self.children[1].Evaluate(st)).isdigit()):
-            st.setter(self.children[0], self.children[1].Evaluate(st), 'INTEGER')
+        child1 = self.children[0]
+        child2 = self.children[1].Evaluate(st)
+        child2val = child2[0]
+        child2type = child2[1]
+        # print(child1)
+        # print(child2)
+        # print(child2.Evaluate(st))
+        # var1 = st.getteraux(child1)
+        if (child2type == 'BOOLEAN' and child2val in [False, True]):
+            st.setter(child1, child2val, 'BOOLEAN')
+        elif (child2type == 'INTEGER' and str(child2val).isdigit()):
+            st.setter(child1, child2val, 'INTEGER')
         else:
-            raise ValueError('Variable type %s does not match value %s' %(var1[1], self.children[1]))
+            raise ValueError('Operand type "%s" does not match value "%s"' %(child2val, child2val))
 
 
 class Print(Node):
     def Evaluate(self, st):
-        print(self.children[0].Evaluate(st))
+        # print('print:', self.children[1].Evaluate(st))
+        print(self.children[0].Evaluate(st)[0])
 
 class While(Node):
     def Evaluate(self, st):
-        while (self.children[0].Evaluate(st)):
+        # print('while: ', self.children[0].Evaluate(st)[0])
+        while (self.children[0].Evaluate(st)[0]):
             self.children[1].Evaluate(st)
 
 class If(Node):
@@ -118,8 +146,13 @@ class If(Node):
 
 class Input(Node):
     def Evaluate(self, st):
-        print('Input:')
-        return int(input())
+        # print('Input:')
+        userinput = input('Input: ')
+        try:
+            userinput = int(userinput)
+            return [userinput, 'INTEGER']
+        except:
+            raise ValueError('Expected INT input, got input "%s" of type: "%s"' %(userinput, type(userinput)))
 
 class VarDec(Node):
     def Evaluate(self, st):
@@ -130,6 +163,18 @@ class VarType(Node):
     def Evaluate(self, st):
         return self.value
 
+class SymbolTable:
+    def __init__(self):
+        self.symtabledict = {}
+
+    def getteraux(self, identifier):
+        return self.symtabledict[identifier]
+    def getter(self, identifier):
+        return self.symtabledict[identifier]
+    def setter(self, identifier, value, vartype):
+        self.symtabledict[identifier] = [value, vartype]
+
+
 class Tokenizer:
     def __init__(self, origin):
         self.origin = PrePro.removeComments(origin)
@@ -137,7 +182,7 @@ class Tokenizer:
         self.actual = Token('EOF', 'EOF')
         self.reservedwords =    ['PRINT', 'IF', 'WHILE', 'THEN', 'ELSE', 'WEND',
                                 'INPUT', 'END', 'SUB', 'MAIN', 'INTEGER', 'BOOLEAN',
-                                'DIM', 'AS', 'TRUE', 'FALSE']
+                                'DIM', 'AS', 'TRUE', 'FALSE', 'NOT', 'AND', 'OR']
         self.selectNext()
 
     def selectNext(self):
@@ -194,23 +239,28 @@ class Tokenizer:
             elif (token == '>'):
                 self.actual = Token('GREATER', token)
             else:
-                raise ValueError('Unexpected token %s' %(token))
+                raise ValueError('Unexpected token "%s"' %(token))
         # print(self.actual.tokentype, self.actual.tokenvalue)
 
 
 
-class SymbolTable:
-    def __init__(self):
-        self.symtabledict = {}
-
-    def getteraux(self, identifier):
-        return self.symtabledict[identifier]
-    def getter(self, identifier):
-        return self.symtabledict[identifier][0]
-    def setter(self, identifier, value, vartype):
-        self.symtabledict[identifier] = [value, vartype]
 
 class Parser:
+    @staticmethod
+    def varType():
+        vartype = Parser.tokens.actual
+        if (Parser.tokens.actual.tokentype == 'COMM'):
+            if (Parser.tokens.actual.tokenvalue == 'INTEGER'):
+                Parser.tokens.selectNext()
+                return VarType('INTEGER')
+            elif (Parser.tokens.actual.tokenvalue == 'BOOLEAN'):
+                Parser.tokens.selectNext()
+                return VarType('BOOLEAN')
+            else:
+                raise SyntaxError('Unrecognized variable type "%s"' %(Parser.tokens.actual.tokenvalue))
+        else:
+            raise SyntaxError('Expected command type token, got token of type "%s"' %(Parser.tokens.actual.tokentype))
+
     @staticmethod
     def factorExpression():
         try:
@@ -219,18 +269,20 @@ class Parser:
             raise ValueError('Token not found')
         if (token1.tokentype == 'INT'):
             Parser.tokens.selectNext()
-            return IntVal(token1.tokenvalue)
+            return IntVal('INT', [token1.tokenvalue, VarType('INTEGER')])
 
-        elif (token1.tokentype == 'PLUS' or token1.tokentype == 'MINUS'):
+        elif (token1.tokentype == 'PLUS' or token1.tokentype == 'MINUS' or token1.tokenvalue == 'NOT'):
             if (token1.tokentype == 'PLUS'):
                 Parser.tokens.selectNext()
                 return UnOp('+', [Parser.factorExpression()])
             elif (token1.tokentype == 'MINUS'):
                 Parser.tokens.selectNext()
                 return UnOp('-', [Parser.factorExpression()])
-
+            elif (token1.tokenvalue == 'NOT'):
+                Parser.tokens.selectNext()
+                return UnOp('NOT', [Parser.factorExpression()])
             else:
-                raise SyntaxError('Unexpected unary operation %s' %(token1.tokenvalue))
+                raise SyntaxError('Unexpected unary operation "%s"' %(token1.tokenvalue))
 
         elif (token1.tokentype == 'IDENT'):
             Parser.tokens.selectNext()
@@ -244,23 +296,24 @@ class Parser:
                 Parser.tokens.selectNext()
                 return parexpr
             else:
-                raise SyntaxError('Unexpected token  %s, expected ")"' %(Parser.tokens.actual.tokenvalue))
+                raise SyntaxError('Unexpected token  "%s", expected ")"' %(Parser.tokens.actual.tokenvalue))
         elif (token1.tokenvalue == 'INPUT'):
             Parser.tokens.selectNext()
+            print('input')
             return Input()
         elif (token1.tokentype == 'COMM'):
             if (token1.tokenvalue in ['TRUE', 'FALSE']):
                 Parser.tokens.selectNext()
-                return BoolVal(token1.tokenvalue)
+                return BoolVal('BOOL', [token1.tokenvalue, VarType('BOOLEAN')])
             else:
-                raise ValueError('Expected "TRUE" or "FALSE", got %s' %(token1.tokenvalue))
+                raise ValueError('Expected "TRUE" or "FALSE", got "%s"' %(token1.tokenvalue))
         else:
-            raise SyntaxError('Invalid token %s of type %s' %(token1.tokenvalue, token1.tokentype))
+            raise SyntaxError('Invalid token "%s" of type "%s"' %(token1.tokenvalue, token1.tokentype))
 
     @staticmethod
     def termExpression():
         termop = Parser.factorExpression()
-        while (Parser.tokens.actual.tokentype == 'DIV' or Parser.tokens.actual.tokentype == 'MULT'):
+        while (Parser.tokens.actual.tokentype == 'DIV' or Parser.tokens.actual.tokentype == 'MULT' or Parser.tokens.actual.tokenvalue == 'AND'):
             termop = BinOp(Parser.tokens.actual.tokenvalue, [termop])
             Parser.tokens.selectNext()
             factor2 = Parser.factorExpression()
@@ -270,7 +323,7 @@ class Parser:
     @staticmethod
     def parserExpression():
         parserop = Parser.termExpression()
-        while (Parser.tokens.actual.tokentype == 'PLUS' or Parser.tokens.actual.tokentype == 'MINUS'):
+        while (Parser.tokens.actual.tokentype == 'PLUS' or Parser.tokens.actual.tokentype == 'MINUS' or Parser.tokens.actual.tokenvalue == 'OR'):
             parserop = BinOp(Parser.tokens.actual.tokenvalue, [parserop])
             Parser.tokens.selectNext()
             parserop.children.append(Parser.termExpression())
@@ -296,7 +349,7 @@ class Parser:
                             if (Parser.tokens.actual.tokenvalue not in ['ELSE', 'END']):
                                 thentree.children.append(Parser.statement())
                     else:
-                        raise SyntaxError('Expected endline token, got %s' %(Parser.tokens.actual.tokenvalue))
+                        raise SyntaxError('Expected endline token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                     iftree.children.append(thentree)
                     if (Parser.tokens.actual.tokenvalue == 'ELSE'):
                         elsetree = Statements('STATEMENTS', [])
@@ -307,7 +360,7 @@ class Parser:
                                 if (Parser.tokens.actual.tokenvalue not in ['END']):
                                     elsetree.children.append(Parser.statement())
                         else:
-                            raise SyntaxError('Expected endline token, got %s' %(Parser.tokens.actual.tokenvalue))
+                            raise SyntaxError('Expected endline token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                         iftree.children.append(elsetree)
                         if (Parser.tokens.actual.tokenvalue == 'END'):
                             Parser.tokens.selectNext()
@@ -315,18 +368,18 @@ class Parser:
                                 Parser.tokens.selectNext()
                                 return iftree
                             else:
-                                raise SyntaxError('Expected "IF" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                                raise SyntaxError('Expected "IF" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                         else:
-                            raise SyntaxError('Expected "END" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                            raise SyntaxError('Expected "END" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                     elif (Parser.tokens.actual.tokenvalue == 'END'):
                         Parser.tokens.selectNext()
                         if (Parser.tokens.actual.tokenvalue == 'IF'):
                             Parser.tokens.selectNext()
                             return iftree
                     else:
-                        raise SyntaxError('Expected "ELSE" or "END" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                        raise SyntaxError('Expected "ELSE" or "END" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                 else:
-                    raise SyntaxError('Expected "THEN" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                    raise SyntaxError('Expected "THEN" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
             elif (Parser.tokens.actual.tokenvalue == 'WHILE'):
                 Parser.tokens.selectNext()
                 whiletree = While('WHILE', [Parser.relExpression()])
@@ -340,11 +393,12 @@ class Parser:
                     if (Parser.tokens.actual.tokenvalue == 'WEND'):
                         Parser.tokens.selectNext()
                         whiletree.children.append(whilestmts)
+                        # print('while')
                         return whiletree
                     else:
-                        raise SyntaxError('Expected "WEND" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                        raise SyntaxError('Expected "WEND" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                 else:
-                    raise SyntaxError('Expected endline token, got %s' %(Parser.tokens.actual.tokenvalue))
+                    raise SyntaxError('Expected endline token, got "%s"' %(Parser.tokens.actual.tokenvalue))
             elif (Parser.tokens.actual.tokenvalue == 'DIM'):
                 Parser.tokens.selectNext()
                 if (Parser.tokens.actual.tokentype == 'IDENT'):
@@ -354,10 +408,11 @@ class Parser:
                         Parser.tokens.selectNext()
                         return VarDec('VARDEC', [ident, Parser.varType()])
                     else:
-                        raise SyntaxError('Expected "AS" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                        raise SyntaxError('Expected "AS" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                 else:
-                    raise SyntaxError('Expected variable name (only alphabetic characters allowed) token, got %s' %(Parser.tokens.actual.tokenvalue))
+                    raise SyntaxError('Expected variable name (only alphabetic characters allowed) token, got "%s"' %(Parser.tokens.actual.tokenvalue))
         elif (Parser.tokens.actual.tokentype == 'IDENT'):
+            # print('ident')
             ident = Parser.tokens.actual
             Parser.tokens.selectNext()
             if (Parser.tokens.actual.tokentype == 'ASSIG'):
@@ -365,30 +420,17 @@ class Parser:
                 assigtree = Assignment('ASSIG', [ident.tokenvalue, Parser.relExpression()])
                 return assigtree
             else:
-                raise SyntaxError('Expected assignment token "=", got %s' %(Parser.tokens.actual.tokenvalue))
+                raise SyntaxError('Expected assignment token "=", got "%s"' %(Parser.tokens.actual.tokenvalue))
         else:
             return NoOp()
-
-    @staticmethod
-    def varType():
-        vartype = Parser.tokens.actual
-        if (Parser.tokens.actual.tokentype == 'COMM'):
-            if (Parser.tokens.actual.tokenvalue == 'INTEGER'):
-                Parser.tokens.selectNext()
-                return VarType('INTEGER')
-            elif (Parser.tokens.actual.tokenvalue == 'BOOLEAN'):
-                Parser.tokens.selectNext()
-                return VarType('BOOLEAN')
-            else:
-                raise SyntaxError('Unrecognized variable type %s' %(Parser.tokens.actual.tokenvalue))
-        else:
-            raise SyntaxError('Expected command type token, got token of type %s' %(Parser.tokens.actual.tokentype))
 
 
 
     @staticmethod
     def program():
         program = []
+        if (Parser.tokens.actual.tokenvalue == '\n'):
+            Parser.tokens.selectNext()
         if (Parser.tokens.actual.tokenvalue == 'SUB'):
             Parser.tokens.selectNext()
             if (Parser.tokens.actual.tokenvalue == 'MAIN'):
@@ -398,6 +440,7 @@ class Parser:
                     if (Parser.tokens.actual.tokenvalue == ')'):
                         Parser.tokens.selectNext()
                         while (Parser.tokens.actual.tokenvalue == '\n'):
+                            # print('oi')
                             Parser.tokens.selectNext()
                             if (Parser.tokens.actual.tokenvalue not in ['END']):
                                 program.append(Parser.statement())
@@ -406,31 +449,31 @@ class Parser:
                             if (Parser.tokens.actual.tokenvalue == 'SUB'):
                                 Parser.tokens.selectNext()
                             else:
-                                raise SyntaxError('Expected "SUB" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                                raise SyntaxError('Expected "SUB" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                         else:
-                            raise SyntaxError('Expected "END" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                            raise SyntaxError('Expected "END" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                     else:
-                        raise SyntaxError('Expected "(" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                        raise SyntaxError('Expected "(" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                 else:
-                    raise SyntaxError('Expected ")" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                    raise SyntaxError('Expected ")" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
             else:
-                raise SyntaxError('Expected "Main" token, got %s' %(Parser.tokens.actual.tokenvalue))
+                raise SyntaxError('Expected "Main" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
         else:
-            raise SyntaxError('Expected "Sub" token, got %s' %(Parser.tokens.actual.tokenvalue))
+            raise SyntaxError('Expected "Sub" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
         return Program('PROGRAM', program)
 
     @staticmethod
     def relExpression():
-        var1 = Parser.parserExpression()
+        expr1 = Parser.parserExpression()
         op = Parser.tokens.actual
         if (op.tokenvalue in ['=', '<', '>']):
-            relop = BinOp(op.tokenvalue, [var1])
+            relop = BinOp(op.tokenvalue, [expr1])
             Parser.tokens.selectNext()
-            var2 = Parser.parserExpression()
-            relop.children.append(var2)
+            expr2 = Parser.parserExpression()
+            relop.children.append(expr2)
             return relop
         else:
-            return var1
+            return expr1
 
     def run(code):
         Parser.tokens = Tokenizer(code)
@@ -442,7 +485,7 @@ class Parser:
 
 '''Rotina de Testes'''
 file = sys.argv[1]
-# file = './test.vbs'
+# file = './test4.vbs'
 with open(file, 'r', encoding='utf-8') as infile:
     lines = infile.read()
 
