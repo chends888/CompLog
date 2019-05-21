@@ -25,12 +25,116 @@ class PrePro:
             procorigin += i
         return procorigin
 
+class Assembler:
+    stringfile = ''
+
+    @staticmethod
+    def AddToFile(string):
+        Assembler.stringfile += ('  '+string)
+    @staticmethod
+    def WriteFile(file):
+        precode = '''; constants
+SYS_EXIT equ 1
+SYS_READ equ 3
+SYS_WRITE equ 4
+STDIN equ 0
+STDOUT equ 1
+True equ 1
+False equ 0
+
+
+segment .data
+
+segment .bss ; variables
+  res RESB 1
+
+section .text
+  global _start
+
+print:  ; subrotina print
+
+  PUSH EBP ; guarda o base pointer
+  MOV EBP, ESP ; estabelece um novo base pointer
+
+  MOV EAX, [EBP+8] ; 1 argumento antes do RET e EBP
+  XOR ESI, ESI
+
+print_dec: ; empilha todos os digitos
+  MOV EDX, 0
+  MOV EBX, 0x000A
+  DIV EBX
+  ADD EDX, '0'
+  PUSH EDX
+  INC ESI ; contador de digitos
+  CMP EAX, 0
+  JZ print_next ; quando acabar pula
+  JMP print_dec
+
+print_next:
+  CMP ESI, 0
+  JZ print_exit ; quando acabar de imprimir
+  DEC ESI
+
+  MOV EAX, SYS_WRITE
+  MOV EBX, STDOUT
+
+  POP ECX
+  MOV [res], ECX
+  MOV ECX, res
+
+  MOV EDX, 1
+  INT 0x80
+  JMP print_next
+
+print_exit:
+  POP EBP
+  RET
+
+; subrotinas if/while
+binop_je:
+  JE binop_true
+  JMP binop_false
+
+binop_jg:
+  JG binop_true
+  JMP binop_false
+
+binop_jl:
+  JL binop_true
+  JMP binop_false
+
+binop_false:
+  MOV EBX, False
+  JMP binop_exit
+binop_true:
+  MOV EBX, True
+binop_exit:
+  RET
+
+_start:
+
+  PUSH EBP ; guarda o base pointer
+  MOV EBP, ESP ; estabelece um novo base pointer
+'''
+        postcode = '''; output interruption
+POP EBP
+MOV EAX, 1
+INT 0X80'''
+        with open(str(file)[:-3]+'nasm', 'w') as f:
+            f.write(precode + Assembler.stringfile + postcode)
+
 class Node:
+    i = 0
     def __init__(self, value=False, nodes=[]):
         self.value = value
         self.children = nodes
+        self.id = Node.i
+        Node.NewId()
     def Evaluate(self, st):
         pass
+    @staticmethod
+    def NewId():
+        Node.i += 1
 
 class BinOp (Node):
     def Evaluate(self, st):
@@ -47,24 +151,40 @@ class BinOp (Node):
             "AND": operator.and_
         }
         child1 = self.children[0].Evaluate(st)
+        Assembler.AddToFile('PUSH EBX\n')
         child2 = self.children[1].Evaluate(st)
+        Assembler.AddToFile('POP EAX\n')
         child2val = child2[0]
         child2type = child2[1]
         if (child1[1] == 'INTEGER' and child2type == 'INTEGER' and self.value in ['+', '-', '*', '//']):
+            if (self.value == '+'):
+                Assembler.AddToFile('ADD EAX, EBX\n')
+            elif (self.value == '-'):
+                Assembler.AddToFile('SUB EAX, EBX\n')
+            elif (self.value == '*'):
+                Assembler.AddToFile('IMUL EBX\n')
+            else:
+                Assembler.AddToFile('IDIV EBX\n')
+            Assembler.AddToFile('MOV EBX, EAX\n')
             return [allowed_operators[self.value](child1[0], child2val), 'INTEGER']
         elif (child1[1] == 'INTEGER' and child2type == 'INTEGER' and self.value in ['=', '>', '<']):
+            # Assembler.AddToFile('POP EAX\n')
+            Assembler.AddToFile('CMP EAX, EBX\n')
+            if (self.value == '='):
+                Assembler.AddToFile('CALL binop_je\n')
+            elif (self.value == '>'):
+                Assembler.AddToFile('CALL binop_jg\n')
+            else:
+                Assembler.AddToFile('CALL binop_jl\n')
             return [allowed_operators[self.value](child1[0], child2val), 'BOOLEAN']
         elif (child1[1] == 'BOOLEAN' and child2type == 'BOOLEAN' and self.value in ['OR', 'AND', '=']):
             return [allowed_operators[self.value](child1[0], child2val), 'BOOLEAN']
         else:
-            print(child1)
-            print(child2)
             raise ValueError('Operands type "%s" and "%s" does not match operation "%s"' %(child1[1], child2[1], self.value))
 
 class UnOp(Node):
     def Evaluate(self, st):
         child = self.children[0].Evaluate(st)
-        # print(child)
         if (self.value in ['-', '+']):
             if (child[1] == 'INTEGER'):
                 if (self.value == '+'):
@@ -81,19 +201,24 @@ class UnOp(Node):
 
 class IntVal(Node):
     def Evaluate(self, st):
+        Assembler.AddToFile('MOV EBX, %s\n' %(self.children[0]))
         return [int(self.children[0]), self.children[1].Evaluate(st)]
 
 class BoolVal(Node):
     def Evaluate(self, st):
-        # print('qqqqqqqq', self.value)
         if (self.children[0] == 'TRUE'):
+            Assembler.AddToFile('MOV EBX, %s\n' %(self.children[0]))
             return [True, self.children[1].Evaluate(st)]
-        else:
+        elif (self.children[0] == 'FALSE'):
+            Assembler.AddToFile('MOV EBX, %s\n' %(self.children[0]))
             return [False, self.children[1].Evaluate(st)]
+        else:
+            raise ValueError('Unexpected boolean value "%s"' %(self.children[0]))
 
 class Identifier(Node):
     def Evaluate(self, st):
-        return st.getter(self.value)
+        Assembler.AddToFile('MOV EBX, [EBP - %s]\n' %(st.Getter(self.value)[2]))
+        return st.Getter(self.value)
 
 class NoOp(Node):
     pass
@@ -114,39 +239,50 @@ class Assignment(Node):
         child2 = self.children[1].Evaluate(st)
         child2val = child2[0]
         child2type = child2[1]
-        # print(child1)
-        # print(child2)
-        # print(child2.Evaluate(st))
-        # var1 = st.getteraux(child1)
         if (child2type == 'BOOLEAN' and child2val in [False, True]):
-            st.setter(child1, child2val, 'BOOLEAN')
+            st.Setter(child1, child2val, 'BOOLEAN')
+            Assembler.AddToFile('MOV [EBP - %s], EBX\n' %(st.Getter(child1)[2]))
         elif (child2type == 'INTEGER' and str(child2val).isdigit()):
-            st.setter(child1, child2val, 'INTEGER')
+            st.Setter(child1, child2val, 'INTEGER')
+            Assembler.AddToFile('MOV [EBP - %s], EBX\n' %(st.Getter(child1)[2]))
         else:
             raise ValueError('Operand type "%s" does not match value "%s"' %(child2val, child2val))
 
 
 class Print(Node):
     def Evaluate(self, st):
-        # print('print:', self.children[1].Evaluate(st))
         print(self.children[0].Evaluate(st)[0])
+        Assembler.AddToFile('PUSH EBX\n')
+        Assembler.AddToFile('CALL print\n')
+        Assembler.AddToFile('POP EBX\n')
 
 class While(Node):
     def Evaluate(self, st):
-        # print('while: ', self.children[0].Evaluate(st)[0])
-        while (self.children[0].Evaluate(st)[0]):
-            self.children[1].Evaluate(st)
+        Assembler.AddToFile('LOOP_%s:\n' %(self.id))
+        self.children[0].Evaluate(st)
+        Assembler.AddToFile('CMP EBX, False\n')
+        Assembler.AddToFile('JE EXIT_%s\n' %(self.id))
+        self.children[1].Evaluate(st)
+        Assembler.AddToFile('JMP LOOP_%s\n' %(self.id))
+        Assembler.AddToFile('EXIT_%s:\n' %(self.id))
 
 class If(Node):
     def Evaluate(self, st):
-        if (self.children[0].Evaluate(st)[0]):
-            self.children[1].Evaluate(st)
-        elif (len(self.children) == 3):
+        Assembler.AddToFile('IF_%s:\n' %(self.id))
+        self.children[0].Evaluate(st)
+        Assembler.AddToFile('CMP EBX, False\n')
+        if (len(self.children) == 3):
+            Assembler.AddToFile('ELSE_%s:\n' %(self.id))
+        else:
+            Assembler.AddToFile('ENDIF_%s:\n' %(self.id))
+        self.children[1].Evaluate(st)
+        Assembler.AddToFile('JMP ENDIF_%s:\n' %(self.id))
+        if (len(self.children) == 3):
+            Assembler.AddToFile('ELSE_%s:\n' %(self.id))
             self.children[2].Evaluate(st)
 
 class Input(Node):
     def Evaluate(self, st):
-        # print('Input:')
         userinput = input('Input: ')
         print('\n')
         try:
@@ -157,8 +293,9 @@ class Input(Node):
 
 class VarDec(Node):
     def Evaluate(self, st):
-        # print('var1:', self.children[1].Evaluate(st))
-        st.setter(self.children[0], False, self.children[1].Evaluate(st))
+        st.Setter(self.children[0], None, self.children[1].Evaluate(st))
+        Assembler.AddToFile('PUSH DWORD 0\n')
+
 
 class VarType(Node):
     def Evaluate(self, st):
@@ -167,13 +304,16 @@ class VarType(Node):
 class SymbolTable:
     def __init__(self):
         self.symtabledict = {}
+        self.shift = 0
 
-    def getteraux(self, identifier):
+    def Getter(self, identifier):
         return self.symtabledict[identifier]
-    def getter(self, identifier):
-        return self.symtabledict[identifier]
-    def setter(self, identifier, value, vartype):
-        self.symtabledict[identifier] = [value, vartype]
+    def Setter(self, identifier, value, vartype):
+        if identifier in self.symtabledict.keys():
+            self.symtabledict[identifier][0] = value
+        else:
+            self.shift += 4
+            self.symtabledict[identifier] = [None, vartype, self.shift]
 
 
 class Tokenizer:
@@ -241,7 +381,6 @@ class Tokenizer:
                 self.actual = Token('GREATER', token)
             else:
                 raise ValueError('Unexpected token "%s"' %(token))
-        # print(self.actual.tokentype, self.actual.tokenvalue)
 
 
 
@@ -300,7 +439,6 @@ class Parser:
                 raise SyntaxError('Unexpected token  "%s", expected ")"' %(Parser.tokens.actual.tokenvalue))
         elif (token1.tokenvalue == 'INPUT'):
             Parser.tokens.selectNext()
-            print('input')
             return Input()
         elif (token1.tokentype == 'COMM'):
             if (token1.tokenvalue in ['TRUE', 'FALSE']):
@@ -385,7 +523,6 @@ class Parser:
                 Parser.tokens.selectNext()
                 whiletree = While('WHILE', [Parser.relExpression()])
                 whilestmts = Statements('STATEMENTS', [])
-                # whiletree.children.append(Parser.relExpression())
                 if (Parser.tokens.actual.tokenvalue == '\n'):
                     while (Parser.tokens.actual.tokenvalue == '\n'):
                         Parser.tokens.selectNext()
@@ -394,7 +531,6 @@ class Parser:
                     if (Parser.tokens.actual.tokenvalue == 'WEND'):
                         Parser.tokens.selectNext()
                         whiletree.children.append(whilestmts)
-                        # print('while')
                         return whiletree
                     else:
                         raise SyntaxError('Expected "WEND" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
@@ -413,7 +549,6 @@ class Parser:
                 else:
                     raise SyntaxError('Expected variable name (only alphabetic characters allowed) token, got "%s"' %(Parser.tokens.actual.tokenvalue))
         elif (Parser.tokens.actual.tokentype == 'IDENT'):
-            # print('ident')
             ident = Parser.tokens.actual
             Parser.tokens.selectNext()
             if (Parser.tokens.actual.tokentype == 'ASSIG'):
@@ -441,7 +576,6 @@ class Parser:
                     if (Parser.tokens.actual.tokenvalue == ')'):
                         Parser.tokens.selectNext()
                         while (Parser.tokens.actual.tokenvalue == '\n'):
-                            # print('oi')
                             Parser.tokens.selectNext()
                             if (Parser.tokens.actual.tokenvalue not in ['END']):
                                 program.append(Parser.statement())
@@ -487,8 +621,9 @@ class Parser:
 '''Rotina de Testes'''
 file = sys.argv[1]
 # file = './test4.vbs'
-with open(file, 'r', encoding='utf-8') as infile:
-    lines = infile.read()
+with open(file, 'r', encoding='utf-8') as file:
+    lines = file.read()
 
 st = SymbolTable()
 Parser.run(lines).Evaluate(st)
+Assembler.WriteFile(file.name)
