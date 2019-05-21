@@ -284,6 +284,7 @@ class If(Node):
 class Input(Node):
     def Evaluate(self, st):
         userinput = input('Input: ')
+        print('\n')
         try:
             userinput = int(userinput)
             return [userinput, 'INTEGER']

@@ -4,29 +4,37 @@ Repository for the Computer Logic course. Building a compiler from scratch (usin
 
 ## EBNF:
 
-statements = statement, "\n", { statement, "\n" };
+program = "SUB", "MAIN", "(", ")", "\n", { statement, "\n" }, "END", "SUB";
 
-statement = assignment | print | statements | while | if ;
+statement = assignment | print | statements | while | if | dimension;
 
-assignment = identifier, "=", (expression, "input") ;
+assignment = identifier, "=", rel expression ;
 
-print = "print", expression ;
+print = "PRINT", rel expression ;
 
-while = "while", relexpression, "\n", statements, "\n", "WEND" ;
+while = "WHILE", rel expression, "\n", {statement, "\n"}, "WEND" ;
 
-if = "if", relexpression, "\n", "then", statements, {"else", statements}, "end if" ;
+if = "IF", rel expression, "\n", "THEN", {statement, "\n"}, ["else", "\n", {statement, "\n"}], "\n", "END", "IF" ;
 
-relexpression = expression, {">", "<", "="},  expression
+dimension = "DIM", identifier, "AS", type ;
 
-expression = term, { ("+" | "-" | ">" | "<" | "="), term } ;
+type = "INTEGER", "BOOLEAN" ;
 
-term = factor, { ("*" | "/"), factor } ;
+rel expression = expression, [(">" | "<" | "="),  expression] ;
 
-factor = ("+" | "-"), factor | num | "(", expression, ")" | identifier ;
+expression = term, {("+" | "-" | "OR"), term} ;
 
-identifier = letter, { letter | digit | "_" } ;
+term = factor, {("*" | "/" | "AND"), factor} ;
 
-num = digit, { digit } ;
+factor = [("+" | "-" | "NOT")], factor | num | identifier | boolean | "(", rel expression, ")" | input ;
+
+identifier = letter, {letter} ;
+
+num = digit, {digit} ;
+
+input = num ;
+
+boolean = "TRUE" | "FALSE" ;
 
 letter = ( a | ... | z | A | ... | Z ) ;
 
@@ -37,4 +45,4 @@ digit = ( 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 0 ) ;
 
 ## Syntactic Diagram
 
-![DS2.2](https://github.com/chends888/CompLog/blob/master/assets/ds2.2.png)
+![DS2.3](https://github.com/chends888/CompLog/blob/master/assets/ds2.3.png)
