@@ -268,9 +268,17 @@ class While(Node):
 
 class If(Node):
     def Evaluate(self, st):
-        if (self.children[0].Evaluate(st)):
-            self.children[1].Evaluate(st)
-        elif (len(self.children) == 3):
+        Assembler.AddToFile('IF_%s:\n' %(self.id))
+        self.children[0].Evaluate(st)
+        Assembler.AddToFile('CMP EBX, False\n')
+        if (len(self.children) == 3):
+            Assembler.AddToFile('ELSE_%s:\n' %(self.id))
+        else:
+            Assembler.AddToFile('ENDIF_%s:\n' %(self.id))
+        self.children[1].Evaluate(st)
+        Assembler.AddToFile('JMP ENDIF_%s:\n' %(self.id))
+        if (len(self.children) == 3):
+            Assembler.AddToFile('ELSE_%s:\n' %(self.id))
             self.children[2].Evaluate(st)
 
 class Input(Node):
