@@ -41,6 +41,8 @@ STDIN equ 0
 STDOUT equ 1
 True equ 1
 False equ 0
+TRUE equ 1
+FALSE equ 0
 
 
 segment .data
@@ -178,6 +180,15 @@ class BinOp (Node):
                 Assembler.AddToFile('CALL binop_jl\n')
             return [allowed_operators[self.value](child1[0], child2val), 'BOOLEAN']
         elif (child1[1] == 'BOOLEAN' and child2type == 'BOOLEAN' and self.value in ['OR', 'AND', '=']):
+            if (self.value == 'AND'):
+                Assembler.AddToFile('AND EAX, EBX\n')
+                Assembler.AddToFile('MOV EBX, EAX\n')
+            elif (self.value == 'OR'):
+                Assembler.AddToFile('OR EAX, EBX\n')
+                Assembler.AddToFile('MOV EBX, EAX\n')
+            else :
+                Assembler.AddToFile('CMP EAX, EBX\n')
+                Assembler.AddToFile('CALL binop_je\n')
             return [allowed_operators[self.value](child1[0], child2val), 'BOOLEAN']
         else:
             raise ValueError('Operands type "%s" and "%s" does not match operation "%s"' %(child1[1], child2[1], self.value))
@@ -195,6 +206,10 @@ class UnOp(Node):
                 raise ValueError('Operand type "%s" does not match operation "%s"' %(self.children[0].children[1].Evaluate(st), self.value))
         elif (self.value == 'NOT'):
             if (child[1] == 'BOOLEAN'):
+                if (child[0] == 'TRUE' or child[0] == 'True' or child[0] == '1' or child[0] == 1):
+                    Assembler.AddToFile('MOV EBX, 0\n')
+                else:
+                    Assembler.AddToFile('MOV EBX, 1\n')
                 return [not child[0], 'BOOLEAN']
             else:
                 raise ValueError('Operand type "%s" does not match operation "%s"' %(self.children[0].children[1].Evaluate(st), self.value))
@@ -272,14 +287,15 @@ class If(Node):
         self.children[0].Evaluate(st)
         Assembler.AddToFile('CMP EBX, False\n')
         if (len(self.children) == 3):
-            Assembler.AddToFile('ELSE_%s:\n' %(self.id))
+            Assembler.AddToFile('JE ELSE_%s\n' %(self.id))
         else:
-            Assembler.AddToFile('ENDIF_%s:\n' %(self.id))
+            Assembler.AddToFile('JE ENDIF_%s\n' %(self.id))
         self.children[1].Evaluate(st)
-        Assembler.AddToFile('JMP ENDIF_%s:\n' %(self.id))
         if (len(self.children) == 3):
             Assembler.AddToFile('ELSE_%s:\n' %(self.id))
             self.children[2].Evaluate(st)
+        else:
+            Assembler.AddToFile('ENDIF_%s:\n' %(self.id))
 
 class Input(Node):
     def Evaluate(self, st):
@@ -287,6 +303,7 @@ class Input(Node):
         print('\n')
         try:
             userinput = int(userinput)
+            Assembler.AddToFile('MOV EBX, %s\n' %(str(userinput)))
             return [userinput, 'INTEGER']
         except:
             raise ValueError('Expected INT input, got input "%s" of type: "%s"' %(userinput, type(userinput)))
