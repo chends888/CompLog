@@ -57,8 +57,8 @@ class BinOp (Node):
         elif (child1[1] == 'BOOLEAN' and child2type == 'BOOLEAN' and self.value in ['OR', 'AND', '=']):
             return [allowed_operators[self.value](child1[0], child2val), 'BOOLEAN']
         else:
-            print(child1)
-            print(child2)
+            # print(child1)
+            # print(child2)
             raise ValueError('Operands type "%s" and "%s" does not match operation "%s"' %(child1[1], child2[1], self.value))
 
 class UnOp(Node):
@@ -114,14 +114,10 @@ class Assignment(Node):
         child2 = self.children[1].Evaluate(st)
         child2val = child2[0]
         child2type = child2[1]
-        # print(child1)
-        # print(child2)
-        # print(child2.Evaluate(st))
-        # var1 = st.getteraux(child1)
         if (child2type == 'BOOLEAN' and child2val in [False, True]):
-            st.setter(child1, child2val, 'BOOLEAN')
+            st.setter(child1, child2val, child2type)
         elif (child2type == 'INTEGER' and str(child2val).isdigit()):
-            st.setter(child1, child2val, 'INTEGER')
+            st.setter(child1, child2val, child2type)
         else:
             raise ValueError('Operand type "%s" does not match value "%s"' %(child2val, child2val))
 
@@ -157,6 +153,7 @@ class Input(Node):
 
 class VarDec(Node):
     def Evaluate(self, st):
+        # print(self.children[0])
         # print('var1:', self.children[1].Evaluate(st))
         st.setter(self.children[0], False, self.children[1].Evaluate(st))
 
@@ -164,14 +161,55 @@ class VarType(Node):
     def Evaluate(self, st):
         return self.value
 
-class SymbolTable:
-    def __init__(self):
-        self.symtabledict = {}
+class FuncDec(Node):
+    def Evaluate(self, st):
+        # self.children[0].Evaluate()
+        st.setter(self.value, self, 'FUNCTION')
 
-    def getteraux(self, identifier):
-        return self.symtabledict[identifier]
+class SubDec(Node):
+    def Evaluate(self, st):
+        # self.children[0].Evaluate()
+        st.setter(self.value, self, 'SUB')
+
+class FuncSubCall(Node):
+    def Evaluate(self, st):
+        st = SymbolTable(st)
+        funcsubnode = st.getter(self.value)[0]
+        funcsubnodetype = st.getter(self.value)[1]
+        # print(self.value)
+        # print('funcsubargs:', funcsubnode.children)
+        # print('callargs:', self.children)
+        if (len(funcsubnode.children[1:-1]) != len(self.children)):
+            raise ValueError('Argument amount does not match Function Declaration argument amount')
+        l = []
+        # print(funcsubnode.children)
+        for i in funcsubnode.children[:-1]:
+            i.Evaluate(st)
+            l.append(i.children[0])
+        # print(l)
+        
+        for i,j in enumerate(self.children):
+            # print(self.children[0].children)
+            value = j.Evaluate(st)
+            # print(value)
+            st.setter(l[i+1], value[0], value[1])
+        # print(st.getter('a'))
+        # print(st.symtabledict)
+        funcsubnode.children[-1].Evaluate(st)
+        if (funcsubnodetype == 'FUNCTION'):
+            return st.getter(self.value)
+
+
+class SymbolTable:
+    def __init__(self, ancestor=None):
+        self.symtabledict = {}
+        self.ancestor = ancestor
     def getter(self, identifier):
-        return self.symtabledict[identifier]
+        if (identifier in self.symtabledict):
+            return self.symtabledict[identifier]
+        elif (self.ancestor != None):
+            return self.ancestor.getter(identifier)
+        raise ValueError('Variable "%s" not defined' %(identifier))
     def setter(self, identifier, value, vartype):
         self.symtabledict[identifier] = [value, vartype]
 
@@ -183,7 +221,8 @@ class Tokenizer:
         self.actual = Token('EOF', 'EOF')
         self.reservedwords =    ['PRINT', 'IF', 'WHILE', 'THEN', 'ELSE', 'WEND',
                                 'INPUT', 'END', 'SUB', 'MAIN', 'INTEGER', 'BOOLEAN',
-                                'DIM', 'AS', 'TRUE', 'FALSE', 'NOT', 'AND', 'OR']
+                                'DIM', 'AS', 'TRUE', 'FALSE', 'NOT', 'AND', 'OR',
+                                'FUNCTION', 'CALL']
         self.selectNext()
 
     def selectNext(self):
@@ -203,7 +242,7 @@ class Tokenizer:
             self.actual = Token('INT', token)
 
         elif (self.origin[self.position].isalpha()):
-            while (self.position < (len(self.origin)) and self.origin[self.position].isalpha()):
+            while (self.position < (len(self.origin)) and self.origin[self.position].isalpha() or self.position < (len(self.origin)) and self.origin[self.position] == '_'):
                 token += self.origin[self.position]
                 self.position += 1
             token = token.upper()
@@ -239,6 +278,8 @@ class Tokenizer:
                 self.actual = Token('LESS', token)
             elif (token == '>'):
                 self.actual = Token('GREATER', token)
+            elif (token == ','):
+                self.actual = Token('COMMA', token)
             else:
                 raise ValueError('Unexpected token "%s"' %(token))
         # print(self.actual.tokentype, self.actual.tokenvalue)
@@ -264,8 +305,10 @@ class Parser:
 
     @staticmethod
     def factorExpression():
+        # print('factor')
         try:
             token1 = Parser.tokens.actual
+            # print(token1.tokenvalue, token1.tokentype)
         except:
             raise ValueError('Token not found')
         if (token1.tokentype == 'INT'):
@@ -287,20 +330,39 @@ class Parser:
 
         elif (token1.tokentype == 'IDENT'):
             Parser.tokens.selectNext()
-            return Identifier(token1.tokenvalue)
+            if (Parser.tokens.actual.tokenvalue != '('):
+                return Identifier(token1.tokenvalue)
+
+            funcsubcall = FuncSubCall(token1.tokenvalue)
+            # Parser.tokens.selectNext()
+            # print(Parser.tokens.actual.tokenvalue)
+            if (Parser.tokens.actual.tokenvalue == '('):
+                Parser.tokens.selectNext()
+                while (Parser.tokens.actual.tokenvalue != ')'):
+                    # print(Parser.tokens.actual.tokenvalue)
+                    funcsubcall.children.append(Parser.relExpression())
+                    if (Parser.tokens.actual.tokenvalue == ','):
+                        Parser.tokens.selectNext()
+                        continue
+                    break
+                if (Parser.tokens.actual.tokenvalue != ')'):
+                    raise SyntaxError('Expected ")" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                Parser.tokens.selectNext()
+                return funcsubcall
+            else:
+                raise SyntaxError('Expected token "(", got "%s"' %(Parser.tokens.actual.tokenvalue))
 
         elif (token1.tokenvalue == '('):
             Parser.tokens.selectNext()
             parexpr = Parser.relExpression()
-
             if (Parser.tokens.actual.tokenvalue == ')'):
                 Parser.tokens.selectNext()
                 return parexpr
             else:
-                raise SyntaxError('Unexpected token  "%s", expected ")"' %(Parser.tokens.actual.tokenvalue))
+                raise SyntaxError('Unexpected token "%s", expected ")"' %(Parser.tokens.actual.tokenvalue))
         elif (token1.tokenvalue == 'INPUT'):
             Parser.tokens.selectNext()
-            print('input')
+            # print('input')
             return Input()
         elif (token1.tokentype == 'COMM'):
             if (token1.tokenvalue in ['TRUE', 'FALSE']):
@@ -324,11 +386,132 @@ class Parser:
     @staticmethod
     def parserExpression():
         parserop = Parser.termExpression()
+        # print(Parser.tokens.actual.tokentype)
         while (Parser.tokens.actual.tokentype == 'PLUS' or Parser.tokens.actual.tokentype == 'MINUS' or Parser.tokens.actual.tokenvalue == 'OR'):
             parserop = BinOp(Parser.tokens.actual.tokenvalue, [parserop])
             Parser.tokens.selectNext()
             parserop.children.append(Parser.termExpression())
         return parserop
+    
+    @staticmethod
+    def functionDeclaration():
+        # print('funcdec')
+        funcargs = [VarDec('VARDEC', [])]
+        funcstmts = Statements('STATEMENTS', [])
+        if (Parser.tokens.actual.tokenvalue == 'FUNCTION'):
+            Parser.tokens.selectNext()
+            funcident = Parser.tokens.actual.tokenvalue
+            Parser.tokens.selectNext()
+            if (Parser.tokens.actual.tokenvalue == '('):
+                Parser.tokens.selectNext()
+                if (Parser.tokens.actual.tokenvalue != ')'):
+                    while True:
+                        argident = Parser.tokens.actual.tokenvalue
+                        Parser.tokens.selectNext()
+                        if (Parser.tokens.actual.tokenvalue == 'AS'):
+                            Parser.tokens.selectNext()
+                            funcargs.append(VarDec('VARDEC', [argident, Parser.varType()]))
+                            # Parser.tokens.selectNext()
+                        else:
+                            raise SyntaxError('Expected "AS" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                        if (Parser.tokens.actual.tokenvalue == ','):
+                            Parser.tokens.selectNext()
+                            continue
+                        break
+                if (Parser.tokens.actual.tokenvalue == ')'):
+                    Parser.tokens.selectNext()
+                    if (Parser.tokens.actual.tokenvalue == 'AS'):
+                        Parser.tokens.selectNext()
+                        # functype = VarDec('VARDEC', [funcident, Parser.varType()])
+                        funcargs[0].children.append(funcident)
+                        funcargs[0].children.append(Parser.varType())
+                        # Parser.tokens.selectNext()
+                    if (Parser.tokens.actual.tokenvalue == '\n'):
+                        Parser.tokens.selectNext()
+                        while (Parser.tokens.actual.tokenvalue != 'END'):
+                            funcstmts.children.append(Parser.statement())
+                            if (Parser.tokens.actual.tokenvalue != '\n'):
+                                raise SyntaxError('Expected ENDLINE token after statement, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                            Parser.tokens.selectNext()
+                        if (Parser.tokens.actual.tokenvalue == 'END'):
+                            Parser.tokens.selectNext()
+                            if (Parser.tokens.actual.tokenvalue == "FUNCTION"):
+                                Parser.tokens.selectNext()
+                                funcargs.append(funcstmts)
+                                return FuncDec(funcident, funcargs)
+                                # Statements('STATEMENTS', funcstmts)
+                            else:
+                                raise SyntaxError('Expected "FUNCTION" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                        else:
+                            raise SyntaxError('Expected "END" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                    else:
+                        raise SyntaxError('Expected ENDLINE token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                else:
+                    raise SyntaxError('Expected ")" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+            else:
+                raise SyntaxError('Expected "(" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+        else:
+            raise SyntaxError('Expected "FUNCTION" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+
+
+    @staticmethod
+    def subDeclaration():
+        subargs = [VarDec('VARDEC', [])]
+        substmts = Statements('STATEMENTS', [])
+        if (Parser.tokens.actual.tokenvalue == 'SUB'):
+            Parser.tokens.selectNext()
+            subident = Parser.tokens.actual.tokenvalue
+            Parser.tokens.selectNext()
+            if (Parser.tokens.actual.tokenvalue == '('):
+                Parser.tokens.selectNext()
+                if (Parser.tokens.actual.tokenvalue != ')'):
+                    while True:
+                        argident = Parser.tokens.actual.tokenvalue
+                        Parser.tokens.selectNext()
+                        if (Parser.tokens.actual.tokenvalue == 'AS'):
+                            Parser.tokens.selectNext()
+                            subargs.append(VarDec('VARDEC', [argident, Parser.varType()]))
+                            Parser.tokens.selectNext()
+                        else:
+                            raise SyntaxError('Expected "AS" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                        if (Parser.tokens.actual.tokenvalue == ','):
+                            Parser.tokens.selectNext()
+                            continue
+                        break
+                if (Parser.tokens.actual.tokenvalue == ')'):
+                    Parser.tokens.selectNext()
+                    subargs[0].children.append(subident)
+                    subargs[0].children.append(VarType('SUB'))
+                    if (Parser.tokens.actual.tokenvalue == '\n'):
+                        Parser.tokens.selectNext()
+                        while (Parser.tokens.actual.tokenvalue != 'END'):
+                            # print(Parser.tokens.actual.tokenvalue)
+                            substmts.children.append(Parser.statement())
+                            if (Parser.tokens.actual.tokenvalue != '\n'):
+                                raise SyntaxError('Expected ENDLINE token after statement, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                            Parser.tokens.selectNext()
+                        if (Parser.tokens.actual.tokenvalue == 'END'):
+                            Parser.tokens.selectNext()
+                            if (Parser.tokens.actual.tokenvalue == "SUB"):
+                                Parser.tokens.selectNext()
+                                subargs.append(substmts)
+                                # print('subargs:', subargs)
+                                return SubDec(subident, subargs)
+                                # Statements('STATEMENTS', funcstmts)
+                            else:
+                                raise SyntaxError('Expected "SUB" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                        else:
+                            raise SyntaxError('Expected "END" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                    else:
+                        raise SyntaxError('Expected ENDLINE token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                else:
+                    raise SyntaxError('Expected ")" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+            else:
+                raise SyntaxError('Expected "(" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+        else:
+            raise SyntaxError('Expected "FUNCTION" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+
+
 
     @staticmethod
     def statement():
@@ -411,7 +594,30 @@ class Parser:
                     else:
                         raise SyntaxError('Expected "AS" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                 else:
-                    raise SyntaxError('Expected variable name (only alphabetic characters allowed) token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                    raise SyntaxError('Expected variable identifier (only alphabetic and "_" characters allowed), got "%s"' %(Parser.tokens.actual.tokenvalue))
+            elif (Parser.tokens.actual.tokenvalue == 'CALL'):
+                subcall = FuncSubCall()
+                Parser.tokens.selectNext()
+                if (Parser.tokens.actual.tokentype == 'IDENT'):
+                    subcall.value = Parser.tokens.actual
+                    Parser.tokens.selectNext()
+                    if (Parser.tokens.actual.tokenvalue == '('):
+                        Parser.tokens.selectNext()
+                        while (Parser.tokens.actual.tokenvalue != ')'):
+                            subcall.children.append(Parser.relExpression())
+                            if (Parser.tokens.actual.tokenvalue == ','):
+                                Parser.tokens.selectNext()
+                                continue
+                            break
+                        if (Parser.tokens.actual.tokenvalue != ')'):
+                            raise SyntaxError('Expected ")" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                        return subcall
+                    else:
+                        raise SyntaxError('Expected token "(", got "%s"' %(Parser.tokens.actual.tokenvalue))
+                else:
+                    raise SyntaxError('Expected variable identifier, got "%s"' %(Parser.tokens.actual.tokenvalue))
+            else:
+                raise SyntaxError('Expected command, got "%s"' %(Parser.tokens.actual.tokenvalue))
         elif (Parser.tokens.actual.tokentype == 'IDENT'):
             # print('ident')
             ident = Parser.tokens.actual
@@ -432,35 +638,20 @@ class Parser:
         program = []
         if (Parser.tokens.actual.tokenvalue == '\n'):
             Parser.tokens.selectNext()
-        if (Parser.tokens.actual.tokenvalue == 'SUB'):
-            Parser.tokens.selectNext()
-            if (Parser.tokens.actual.tokenvalue == 'MAIN'):
-                Parser.tokens.selectNext()
-                if (Parser.tokens.actual.tokenvalue == '('):
-                    Parser.tokens.selectNext()
-                    if (Parser.tokens.actual.tokenvalue == ')'):
+        if (Parser.tokens.actual.tokenvalue == 'SUB' or Parser.tokens.actual.tokenvalue == 'FUNCTION'):
+            while (Parser.tokens.actual.tokenvalue == 'SUB' or Parser.tokens.actual.tokenvalue == 'FUNCTION'):
+                if (Parser.tokens.actual.tokenvalue == 'SUB'):
+                    program.append(Parser.subDeclaration())
+                    while (Parser.tokens.actual.tokenvalue == '\n'):
                         Parser.tokens.selectNext()
-                        while (Parser.tokens.actual.tokenvalue == '\n'):
-                            # print('oi')
-                            Parser.tokens.selectNext()
-                            if (Parser.tokens.actual.tokenvalue not in ['END']):
-                                program.append(Parser.statement())
-                        if (Parser.tokens.actual.tokenvalue == 'END'):
-                            Parser.tokens.selectNext()
-                            if (Parser.tokens.actual.tokenvalue == 'SUB'):
-                                Parser.tokens.selectNext()
-                            else:
-                                raise SyntaxError('Expected "SUB" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
-                        else:
-                            raise SyntaxError('Expected "END" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
-                    else:
-                        raise SyntaxError('Expected "(" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                 else:
-                    raise SyntaxError('Expected ")" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
-            else:
-                raise SyntaxError('Expected "Main" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+                    program.append(Parser.functionDeclaration())
+                    # print('oi')
+                    while (Parser.tokens.actual.tokenvalue == '\n'):
+                        Parser.tokens.selectNext()
         else:
-            raise SyntaxError('Expected "Sub" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+            raise SyntaxError('Expected "Sub" or "Function" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
+        program.append(FuncSubCall('MAIN', []))
         return Program('PROGRAM', program)
 
     @staticmethod
