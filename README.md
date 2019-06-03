@@ -45,4 +45,4 @@ digit = ( 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 0 ) ;
 
 ## Syntactic Diagram
 
-![DS2.3](https://github.com/chends888/CompLog/blob/master/assets/ds2.4.png)
+![DS2.4](https://github.com/chends888/CompLog/blob/master/assets/ds2.4.png)
