@@ -4,35 +4,39 @@ Repository for the Computer Logic course. Building a compiler from scratch (usin
 
 ## EBNF:
 
-program = "SUB", "MAIN", "(", ")", "\n", { statement, "\n" }, "END", "SUB";
+program = subdec | funcdec ;
 
-statement = assignment | print | statements | while | if | dimension;
+subdec = "SUB", identifier, "(", {(identifier, "AS", type)}, ")", "\n", {(statement, "\n")}, "END", "SUB" ;
 
-assignment = identifier, "=", rel expression ;
+funcdec = "FUNCTION", identifier, "(", {(identifier, "AS", type)}, ")", "AS", type, "\n", {(statement, "\n")}, "END", "FUNCTION" ;
 
-print = "PRINT", rel expression ;
+statement = assignment | print | statements | while | if | dimension | ("CALL", identifier,"(",  {(relexpression, {",", "relexpression"})}) ;
 
-while = "WHILE", rel expression, "\n", {statement, "\n"}, "WEND" ;
+assignment = identifier, "=", relexpression ;
 
-if = "IF", rel expression, "\n", "THEN", {statement, "\n"}, ["else", "\n", {statement, "\n"}], "\n", "END", "IF" ;
+print = "PRINT", relexpression ;
+
+while = "WHILE", relexpression, "\n", {statement, "\n"}, "WEND" ;
+
+if = "IF", relexpression, "\n", "THEN", {statement, "\n"}, ["else", "\n", {statement, "\n"}], "\n", "END", "IF" ;
 
 dimension = "DIM", identifier, "AS", type ;
 
 type = "INTEGER", "BOOLEAN" ;
 
-rel expression = expression, [(">" | "<" | "="),  expression] ;
+relexpression = expression, [(">" | "<" | "="),  expression] ;
 
 expression = term, {("+" | "-" | "OR"), term} ;
 
 term = factor, {("*" | "/" | "AND"), factor} ;
 
-factor = [("+" | "-" | "NOT")], factor | num | identifier | boolean | "(", rel expression, ")" | input ;
+factor = [("+" | "-" | "NOT")], factor | num | identifier | boolean | "(", relexpression, ")" | input | (identifier,"(",  {(relexpression, {",", "relexpression"})}) ;
 
-identifier = letter, {letter} ;
-
-num = digit, {digit} ;
+identifier = letter, {(letter | "_")} ;
 
 input = num ;
+
+num = digit, {digit} ;
 
 boolean = "TRUE" | "FALSE" ;
 
