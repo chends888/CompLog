@@ -116,10 +116,10 @@ class Assignment(Node):
         child2type = child2[1]
         if (child2type == 'BOOLEAN' and child2val in [False, True]):
             st.setter(child1, child2val, child2type)
-        elif (child2type == 'INTEGER' and str(child2val).isdigit()):
+        elif (child2type == 'INTEGER' and int(child2val)):
             st.setter(child1, child2val, child2type)
         else:
-            raise ValueError('Operand type "%s" does not match value "%s"' %(child2val, child2val))
+            raise ValueError('Operand type "%s" does not match value "%s"' %(child2val, child2type))
 
 
 class Print(Node):
@@ -177,8 +177,8 @@ class FuncSubCall(Node):
         funcsubnode = st.getter(self.value)[0]
         funcsubnodetype = st.getter(self.value)[1]
         # print(self.value)
-        # print('funcsubargs:', funcsubnode.children)
-        # print('callargs:', self.children)
+        print('funcsubargs:', funcsubnode.children[1:-1])
+        print('callargs:', self.children)
         if (len(funcsubnode.children[1:-1]) != len(self.children)):
             raise ValueError('Argument amount does not match Function Declaration argument amount')
         l = []
@@ -333,7 +333,8 @@ class Parser:
             if (Parser.tokens.actual.tokenvalue != '('):
                 return Identifier(token1.tokenvalue)
 
-            funcsubcall = FuncSubCall(token1.tokenvalue)
+            print('funcsubcall', token1.tokenvalue)
+            funcsubcall = FuncSubCall(token1.tokenvalue, [])
             # Parser.tokens.selectNext()
             # print(Parser.tokens.actual.tokenvalue)
             if (Parser.tokens.actual.tokenvalue == '('):
@@ -341,6 +342,7 @@ class Parser:
                 while (Parser.tokens.actual.tokenvalue != ')'):
                     # print(Parser.tokens.actual.tokenvalue)
                     funcsubcall.children.append(Parser.relExpression())
+                    print('appended')
                     if (Parser.tokens.actual.tokenvalue == ','):
                         Parser.tokens.selectNext()
                         continue
@@ -348,6 +350,7 @@ class Parser:
                 if (Parser.tokens.actual.tokenvalue != ')'):
                     raise SyntaxError('Expected ")" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                 Parser.tokens.selectNext()
+                # print(funcsubcall.children)
                 return funcsubcall
             else:
                 raise SyntaxError('Expected token "(", got "%s"' %(Parser.tokens.actual.tokenvalue))
@@ -636,7 +639,7 @@ class Parser:
     @staticmethod
     def program():
         program = []
-        if (Parser.tokens.actual.tokenvalue == '\n'):
+        while (Parser.tokens.actual.tokenvalue == '\n'):
             Parser.tokens.selectNext()
         if (Parser.tokens.actual.tokenvalue == 'SUB' or Parser.tokens.actual.tokenvalue == 'FUNCTION'):
             while (Parser.tokens.actual.tokenvalue == 'SUB' or Parser.tokens.actual.tokenvalue == 'FUNCTION'):
