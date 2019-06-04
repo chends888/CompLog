@@ -26,7 +26,7 @@ class PrePro:
         return procorigin
 
 class Node:
-    def __init__(self, value=False, nodes=[]):
+    def __init__(self, value=None, nodes=[]):
         self.value = value
         self.children = nodes
     def Evaluate(self, st):
@@ -110,14 +110,19 @@ class Statements(Node):
 
 class Assignment(Node):
     def Evaluate(self, st):
+        # print('assigment', self.children)
         child1 = self.children[0]
         child2 = self.children[1].Evaluate(st)
         child2val = child2[0]
         child2type = child2[1]
+        testchild = self.children[0]
+        # print(child1.Evaluate(st), testchild.value)
+        # print('st:', st.symtabledict)
+        # print(child2type)
         if (child2type == 'BOOLEAN' and child2val in [False, True]):
-            st.setter(child1, child2val, child2type)
+            st.setter(child1.value, child2val, child2type)
         elif (child2type == 'INTEGER' and int(child2val)):
-            st.setter(child1, child2val, child2type)
+            st.setter(child1.value, child2val, child2type)
         else:
             raise ValueError('Operand type "%s" does not match value "%s"' %(child2val, child2type))
 
@@ -153,9 +158,9 @@ class Input(Node):
 
 class VarDec(Node):
     def Evaluate(self, st):
-        # print(self.children[0])
+        # print('var1name', self.children[0])
         # print('var1:', self.children[1].Evaluate(st))
-        st.setter(self.children[0], False, self.children[1].Evaluate(st))
+        st.setter(self.children[0], None, self.children[1].Evaluate(st))
 
 class VarType(Node):
     def Evaluate(self, st):
@@ -169,41 +174,53 @@ class FuncDec(Node):
 class SubDec(Node):
     def Evaluate(self, st):
         # self.children[0].Evaluate()
+        # print('sub setter: ', self.value, self)
         st.setter(self.value, self, 'SUB')
 
 class FuncSubCall(Node):
     def Evaluate(self, st):
-        st = SymbolTable(st)
-        funcsubnode = st.getter(self.value)[0]
-        funcsubnodetype = st.getter(self.value)[1]
-        # print(self.value)
-        print('funcsubargs:', funcsubnode.children[1:-1])
-        print('callargs:', self.children)
+        # print('aaaaaaaaaaaaaaa')
+        funcsubst = st.symtabledict.copy()
+        funcsubst = SymbolTable(funcsubst)
+
+        # print('test', funcsubst.getter(self.value))
+        # funcsubst.setter(self.value, self, funcsubst.getter(self.value)[1])
+        funcsubnode = funcsubst.getter(self.value)[0]
+        funcsubnodetype = funcsubst.getter(self.value)[1]
+        # print(funcsubst.getter(self.value))
+        # print(st.symtabledict)
+        # print('children: ', self.children)
+        # print('funcsubnode:', funcsubst.getter(self.value))
+        # print(funcsubnodetype)
+        # print('funcsubargs:', funcsubnode.children[1:-1])
+        # print('callargs:', self.children)
         if (len(funcsubnode.children[1:-1]) != len(self.children)):
             raise ValueError('Argument amount does not match Function Declaration argument amount')
-        l = []
-        # print(funcsubnode.children)
+
+        idents = []
         for i in funcsubnode.children[:-1]:
-            i.Evaluate(st)
-            l.append(i.children[0])
-        # print(l)
+            i.Evaluate(funcsubst)
+            idents.append(i.children[0])
+
         
         for i,j in enumerate(self.children):
             # print(self.children[0].children)
-            value = j.Evaluate(st)
-            # print(value)
-            st.setter(l[i+1], value[0], value[1])
-        # print(st.getter('a'))
-        # print(st.symtabledict)
-        funcsubnode.children[-1].Evaluate(st)
+            # print('j:', j.Evaluate(funcsubst))
+            value = j.Evaluate(funcsubst)
+            # print(funcsubst.symtabledict)
+            funcsubst.setter(idents[i+1], value[0], value[1])
+        # print(funcsubst.getter('a'))
+        # print(funcsubst.symtabledict)
+        funcsubnode.children[-1].Evaluate(funcsubst)
+        # print('bbbbbbbbbbbbb')
         if (funcsubnodetype == 'FUNCTION'):
-            return st.getter(self.value)
+            return funcsubst.getter(self.value)
 
 
 class SymbolTable:
-    def __init__(self, ancestor=None):
-        self.symtabledict = {}
-        self.ancestor = ancestor
+    def __init__(self, ancestor={}):
+        self.symtabledict = ancestor
+        # self.ancestor = ancestor
     def getter(self, identifier):
         if (identifier in self.symtabledict):
             return self.symtabledict[identifier]
@@ -333,7 +350,7 @@ class Parser:
             if (Parser.tokens.actual.tokenvalue != '('):
                 return Identifier(token1.tokenvalue)
 
-            print('funcsubcall', token1.tokenvalue)
+            # print('funcsubcall', token1.tokenvalue)
             funcsubcall = FuncSubCall(token1.tokenvalue, [])
             # Parser.tokens.selectNext()
             # print(Parser.tokens.actual.tokenvalue)
@@ -342,7 +359,7 @@ class Parser:
                 while (Parser.tokens.actual.tokenvalue != ')'):
                     # print(Parser.tokens.actual.tokenvalue)
                     funcsubcall.children.append(Parser.relExpression())
-                    print('appended')
+                    # print('appended')
                     if (Parser.tokens.actual.tokenvalue == ','):
                         Parser.tokens.selectNext()
                         continue
@@ -350,7 +367,7 @@ class Parser:
                 if (Parser.tokens.actual.tokenvalue != ')'):
                     raise SyntaxError('Expected ")" token, got "%s"' %(Parser.tokens.actual.tokenvalue))
                 Parser.tokens.selectNext()
-                # print(funcsubcall.children)
+                # print(funcsubcall.)
                 return funcsubcall
             else:
                 raise SyntaxError('Expected token "(", got "%s"' %(Parser.tokens.actual.tokenvalue))
@@ -622,12 +639,15 @@ class Parser:
             else:
                 raise SyntaxError('Expected command, got "%s"' %(Parser.tokens.actual.tokenvalue))
         elif (Parser.tokens.actual.tokentype == 'IDENT'):
-            # print('ident')
             ident = Parser.tokens.actual
+            # print('ident: ', ident.tokenvalue)
             Parser.tokens.selectNext()
             if (Parser.tokens.actual.tokentype == 'ASSIG'):
+                # print('assig')
                 Parser.tokens.selectNext()
-                assigtree = Assignment('ASSIG', [ident.tokenvalue, Parser.relExpression()])
+                # print(Parser.tokens.actual.tokenvalue)
+                # print(relvalue.children)
+                assigtree = Assignment('ASSIG', [Identifier(ident.tokenvalue), Parser.relExpression()])
                 return assigtree
             else:
                 raise SyntaxError('Expected assignment token "=", got "%s"' %(Parser.tokens.actual.tokenvalue))
@@ -680,7 +700,7 @@ class Parser:
 
 '''Rotina de Testes'''
 file = sys.argv[1]
-# file = './test4.vbs'
+# file = './test.vbs'
 with open(file, 'r', encoding='utf-8') as infile:
     lines = infile.read()
 
